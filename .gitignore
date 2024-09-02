@@ -11,4 +11,4 @@ HISTORY.txt
 README.txt
 
 .vscode/
-.code-workspace
+*.code-workspace
