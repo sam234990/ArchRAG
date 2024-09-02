@@ -48,20 +48,21 @@ def compute_distance(graph):
 
     res_graph.add_nodes_from(graph.nodes)
 
-    for n1 in graph.nodes:
-        n1_emb = n1["embeddding"]
+    for n1 in graph.nodes():
+        n1_emb = graph.nodes[n1]["embedding"]
         for neighbor in graph.neighbors(n1):
             if not res_graph.has_edge(n1, neighbor):
-                nei_emb = neighbor["embedding"]
+                nei_emb = graph.nodes[neighbor]["embedding"]
                 cos_res = embedding_distance(n1_emb, nei_emb)
                 # 将边和余弦相似度结果添加到新图中
                 res_graph.add_edge(n1, neighbor, weight=cos_res)
+        
 
     return res_graph
 
 
 if __name__ == "__main__":
-    base_path = "/home/wangshu/rag/hier_graph_rag/graphrag/ragtest/output/20240813-220313/artifacts"
+    base_path = "/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts"
 
     graph, final_entities, final_relationships = read_graph_nx(base_path)
     cos_graph = compute_distance(graph=graph)

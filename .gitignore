@@ -10,5 +10,7 @@ textpattern/
 HISTORY.txt
 README.txt
 
+__pycache__/
+
 .vscode/
 *.code-workspace
