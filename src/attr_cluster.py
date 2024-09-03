@@ -1,7 +1,7 @@
 import networkx as nx
 from utils import *
 import pandas as pd
-from graspologic.partition import hierarchical_leiden
+from graspologic.partition import hierarchical_leiden, leiden
 
 
 def attribute_hierarchical_clustering(
@@ -38,6 +38,21 @@ def compute_leiden_communities(
         results[partition.level] = results.get(partition.level, {})
         results[partition.level][partition.node] = partition.cluster
     return results
+
+
+def compute_leiden(graph: nx.Graph, max_cluster_size: int, seed: int):
+    # 使用 leiden 算法计算一层
+    community_mapping = leiden(
+        graph,
+        partition_kwargs={"weight": "weight"},
+        random_seed=seed,
+        max_cluster_size=max_cluster_size,
+    )
+
+    # 将结果转换为字典格式，方便处理
+    node_to_community = {node: community for node, community in community_mapping}
+
+    return node_to_community
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from graphrag.index.graph.utils import stable_largest_connected_component
 
 
 
-def run(graph: nx.Graph, args: dict[str, Any]) -> dict[int, dict[str, list[str]]]:
+def run(graph: nx.Graph, args: dict[str, str]) -> dict[int, dict[str, list[str]]]:
     """Run method definition."""
     max_cluster_size = args.get("max_cluster_size", 10)
     use_lcc = args.get("use_lcc", True)
