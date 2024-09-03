@@ -1,13 +1,20 @@
 import json
 import logging
+from prompts import COMMUNITY_REPORT_PROMPT
+
 
 log = logging.getLogger(__name__)
+
+
 
 
 def get_llm_report(llm_invoker, input_text, max_report_length):
     output = None
     try:
-        response = llm_invoker(input_text)
+        report_prompt = COMMUNITY_REPORT_PROMPT.format(input_text)
+
+        response = llm_invoker(report_prompt)
+        output = response.json() or {}
     except Exception as e:
 
         log.exception("error generating community report")
@@ -17,4 +24,4 @@ def get_llm_report(llm_invoker, input_text, max_report_length):
 
 
 if __name__ == "__main__":
-    run_llm_report()
+    get_llm_report()
