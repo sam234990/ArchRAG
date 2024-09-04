@@ -1,7 +1,8 @@
 import networkx as nx
-from pathlib import Path
 import pandas as pd
+import argparse
 from scipy.spatial.distance import cosine
+from pathlib import Path
 
 
 def read_graph_nx(file_path: str):
@@ -56,9 +57,49 @@ def compute_distance(graph):
                 cos_res = embedding_distance(n1_emb, nei_emb)
                 # 将边和余弦相似度结果添加到新图中
                 res_graph.add_edge(n1, neighbor, weight=cos_res)
-        
 
     return res_graph
+
+
+def create_arg_parser():
+    parser = argparse.ArgumentParser(
+        description="All the arguments needed for the project."
+    )
+
+    # 添加参数
+    parser.add_argument(
+        "--api_key",
+        type=str,
+        required=True,
+        help="API key for accessing the service",
+        default="ollama",
+    )
+    parser.add_argument(
+        "--api_base",
+        type=str,
+        required=True,
+        help="Base URL for the API service",
+        default="http://localhost:11434/v1",
+    )
+    parser.add_argument(
+        "--engine",
+        type=str,
+        required=True,
+        default="llama3.1:8b",
+        help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
+    )
+    parser.add_argument(
+        "--max_tokens", type=int, default=1500, help="Maximum tokens to generate"
+    )
+
+    parser.add_argument(
+        "--base_path",
+        type=str,
+        required=True,
+        help="Base path to the directory containing the graph data.",
+    )
+
+    return parser
 
 
 if __name__ == "__main__":
@@ -66,4 +107,3 @@ if __name__ == "__main__":
 
     graph, final_entities, final_relationships = read_graph_nx(base_path)
     cos_graph = compute_distance(graph=graph)
-    
