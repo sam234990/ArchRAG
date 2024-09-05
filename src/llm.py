@@ -1,8 +1,5 @@
-import json
 import logging
-import openai
 from openai import OpenAI
-import argparse
 import time
 from utils import create_arg_parser
 
@@ -70,7 +67,6 @@ def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=
 if __name__ == "__main__":
     parser = create_arg_parser()
 
-    # 解析参数
     args = parser.parse_args()
 
     test_input_text = "What is the capital of France?"

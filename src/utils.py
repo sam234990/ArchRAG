@@ -17,7 +17,7 @@ def read_graph_nx(file_path: str):
 
     final_entities = pd.read_parquet(data_path / "create_final_entities.parquet")
 
-    print(final_entities.head())
+    # print(final_entities.head())
     graph = nx.Graph()
     for _, row in final_entities.iterrows():
         graph.add_node(row["name"], **row.to_dict())
@@ -99,6 +99,35 @@ def create_arg_parser():
         # required=True,
         default="/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts",
         help="Base path to the directory containing the graph data.",
+    )
+
+    parser.add_argument(
+        "--max_retries",
+        type=int,
+        default=5,
+        help="Maximum number of retries to make in case of failure",
+    )
+
+    parser.add_argument(
+        "--embedding_model",
+        type=str,
+        # required=True,
+        default="nomic-embed-text",
+        help="Model engine to be used for embeddings. Example values: 'text-embedding-ada-002', 'text-embedding-ada-003', 'text-embedding-ada-004'",
+    )
+    parser.add_argument(
+        "--embedding_api_key",
+        type=str,
+        # required=True,
+        default="ollama",
+        help="API key for accessing the service",
+    )
+    parser.add_argument(
+        "--embedding_api_base",
+        type=str,
+        # required=True,
+        default="http://localhost:11434/v1",
+        help="Base URL for the API service",
     )
 
     return parser

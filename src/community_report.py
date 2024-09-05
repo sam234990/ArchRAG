@@ -4,6 +4,7 @@ from llm import llm_invoker
 from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
 from utils import *
 from attr_cluster import *
+from lm_emb import *
 
 
 def prep_community_report_context(
@@ -81,27 +82,54 @@ def generate_community_report(community_text, args, community_id, max_generate=3
 
     if success is False:
         print(f"Failed to generate community report for community:{community_id}")
+        return None, None
 
     return raw_result, extract_result
 
 
-def community_report(results_by_level, args, final_entities, final_relationships):
-    level_0 = results_by_level[0]
-    for community_id, node_list in level_0.items():
-        # print(f"Community {community_id}:")
-        # print(f"Nodes:{node_list}")
-        community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
-        community_relationships = final_relationships[
-            final_relationships["source"].isin(node_list)
-        ]
-        print(community_nodes.columns)
-        print(community_relationships.columns)
-        community_text = prep_community_report_context(
-            0, community_nodes, community_relationships
-        )
+def community_report_embedding(community_report, args):
+    text = community_report["title"] + community_report["summary"]
+    embedding = openai_embedding(
+        text, args.embedding_api_key, args.embedding_api_base, args.embedding_model
+    )
+    return embedding
 
-        community_report = generate_community_report(community_text, args, community_id)
-        print(community_report)
+
+def community_report(results_by_level, args, final_entities, final_relationships):
+    results_community = []
+    for level, communities in results_by_level.items():
+        print(f"Create community report for level: {level}")
+        for community_id, node_list in communities.items():
+            print(f"Community {community_id}:")
+            # print(f"Nodes:{node_list}")
+            community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
+            community_relationships = final_relationships[
+                final_relationships["source"].isin(node_list)
+            ]
+            community_text = prep_community_report_context(
+                0, community_nodes, community_relationships
+            )
+
+            raw_result, community_report = generate_community_report(
+                community_text, args, community_id
+            )
+            # print(community_report)
+
+            community_report["community_id"] = community_id
+            community_report["level"] = level
+            community_report["community_nodes"] = node_list
+            community_report["raw_result"] = raw_result
+
+            if raw_result is None or community_report is None:
+                community_report["embedding"] = None
+            else:
+                community_report["embedding"] = community_report_embedding(
+                    community_report, args
+                )
+            results_community.append(community_report)
+
+    community_df = pd.DataFrame(results_community)
+    return community_df
 
 
 if __name__ == "__main__":
@@ -111,4 +139,8 @@ if __name__ == "__main__":
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     cos_graph = compute_distance(graph=graph)
     results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
-    community_report(results_by_level, args, final_entities, final_relationships)
+    community_df = community_report(
+        results_by_level, args, final_entities, final_relationships
+    )
+    output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"
+    community_df.to_csv(output_path, index=False)
