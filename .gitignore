@@ -13,4 +13,5 @@ README.txt
 __pycache__/
 
 .vscode/
+test/
 *.code-workspace

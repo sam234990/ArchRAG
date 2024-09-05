@@ -9,7 +9,8 @@ from utils import create_arg_parser
 
 log = logging.getLogger(__name__)
 
-def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=5):
+
+def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=5, json=False):
 
     if "llama" in args.engine.lower():
         api_key = "ollama"
@@ -28,6 +29,20 @@ def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=
     ]
     message_prompt = {"role": "user", "content": input_text}
     messages.append(message_prompt)
+    # 准备用于传递给 API 的参数字典
+    parameters = {
+        "model": engine,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+    }
+
+    # 如果 json 为 True，加入 response_format 参数
+    if json:
+        parameters["response_format"] = {"type": "json_object"}
+
     print("start openai")
     retries = 0
     success = False
@@ -35,14 +50,7 @@ def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=
 
     while not success and retries < max_retries:
         try:
-            response = client.chat.completions.create(
-                model=engine,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                frequency_penalty=0,
-                presence_penalty=0,
-            )
+            response = client.chat.completions.create(**parameters)
             result = response.choices[0].message.content
             success = True
         except Exception as e:
@@ -61,7 +69,7 @@ def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=
 
 if __name__ == "__main__":
     parser = create_arg_parser()
-    
+
     # 解析参数
     args = parser.parse_args()
 

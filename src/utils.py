@@ -13,6 +13,7 @@ def read_graph_nx(file_path: str):
     final_relationships = pd.read_parquet(
         data_path / "create_final_relationships.parquet"
     )
+    base_entity_graph = pd.read_parquet(data_path / "create_base_entity_graph.parquet")
 
     final_entities = pd.read_parquet(data_path / "create_final_entities.parquet")
 
@@ -70,21 +71,21 @@ def create_arg_parser():
     parser.add_argument(
         "--api_key",
         type=str,
-        required=True,
+        # required=True,
         help="API key for accessing the service",
         default="ollama",
     )
     parser.add_argument(
         "--api_base",
         type=str,
-        required=True,
+        # required=True,
         help="Base URL for the API service",
         default="http://localhost:11434/v1",
     )
     parser.add_argument(
         "--engine",
         type=str,
-        required=True,
+        # required=True,
         default="llama3.1:8b",
         help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
     )
@@ -95,7 +96,8 @@ def create_arg_parser():
     parser.add_argument(
         "--base_path",
         type=str,
-        required=True,
+        # required=True,
+        default="/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts",
         help="Base path to the directory containing the graph data.",
     )
 
