@@ -34,9 +34,20 @@ def test_ori_hnsw(data, queries, dim, M, efSearch, efConstruction):
     top_k = 10
     distance, preds = index.search(queries, k=top_k)
     for i in range(3):
-        print(f"Top {top_k} results: {preds[i]}")
+        print(f"Query number: {i} Top {top_k} results: {preds[i]}")
         print(f"Distances: {distance[i]}")
         print()
+    
+    index_2 = faiss.IndexHCHNSWFlat(dim, M)
+    index_2.hnsw.efConstruction = efConstruction
+    index_2.hnsw.efSearch = efSearch
+    index_2.add(data)
+    distance, preds = index_2.search(queries, k=top_k)
+    for i in range(3):
+        print(f"Query number: {i} Top {top_k} results: {preds[i]}")
+        print(f"Distances: {distance[i]}")
+        print()
+    
 
 
 if __name__ == "__main__":

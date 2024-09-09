@@ -1,8 +1,16 @@
+import tiktoken
+import argparse
 import networkx as nx
 import pandas as pd
-import argparse
 from scipy.spatial.distance import cosine
 from pathlib import Path
+
+
+def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int:
+    """Return the number of tokens in the given text."""
+    if token_encoder is None:
+        token_encoder = tiktoken.get_encoding("cl100k_base")
+    return len(token_encoder.encode(text))  # type: ignore
 
 
 def read_graph_nx(file_path: str):
@@ -90,7 +98,14 @@ def create_arg_parser():
         help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
     )
     parser.add_argument(
-        "--max_tokens", type=int, default=1500, help="Maximum tokens to generate"
+        "--max_tokens", type=int, default=4000, help="Maximum tokens to generate"
+    )
+
+    parser.add_argument(
+        "--max_community_tokens",
+        type=int,
+        default=4000,
+        help="Maximum community report tokens ",
     )
 
     parser.add_argument(

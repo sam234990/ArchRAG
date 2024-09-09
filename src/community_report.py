@@ -1,5 +1,4 @@
 import json
-from typing import cast
 from llm import llm_invoker
 from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
 from utils import *
@@ -7,21 +6,58 @@ from attr_cluster import *
 from lm_emb import *
 
 
-def prep_community_report_context(
-    level, community_nodes, relationships, sub_communities_summary=None
-):
+def trim_community_context(community_nodes, relationships):
     entity_str = ""
     for _, row in community_nodes.iterrows():
         entity_str += f"{row['human_readable_id']},{row['name']},{row['description']}\n"
     relationships_str = ""
     for _, row in relationships.iterrows():
         relationships_str += f"{row['human_readable_id']},{row['source']},{row['target']},{row['description']}\n"
-    # 将生成的字符串插入到上下文中
+
     context = COMMUNITY_CONTEXT.format(
         entity_df=entity_str, relationship_df=relationships_str
     )
-
     return context
+
+
+def prep_community_report_context(
+    level, community_nodes, relationships, sub_communities_summary=None, max_tokens=None
+):
+    relationships_sorted = relationships.copy()
+    relationships_sorted["degree_sum"] = (
+        relationships_sorted["source_degree"] + relationships_sorted["target_degree"]
+    )
+    relationships_sorted = relationships_sorted.sort_values(
+        by="degree_sum", ascending=False
+    )
+
+    selected_relationships = pd.DataFrame(columns=relationships.columns)
+    selected_entities = pd.DataFrame(columns=community_nodes.columns)
+
+    new_string = ""
+    for i in range(len(relationships_sorted)):
+        selected_relationships = relationships_sorted.iloc[:i]
+
+        # Filter entities involved in the selected relationships
+        involved_entity_ids = pd.concat(
+            [selected_relationships["source"], selected_relationships["target"]]
+        ).unique()
+        selected_entities = community_nodes[
+            community_nodes["human_readable_id"].isin(involved_entity_ids)
+        ]
+
+        if max_tokens:
+            context = trim_community_context(selected_entities, selected_relationships)
+            if num_tokens(context) > max_tokens:
+                break
+            new_string = context
+
+    if new_string == "":
+        return trim_community_context(
+            community_nodes=community_nodes, relationships=relationships
+        )
+
+    return new_string
 
 
 def extract_community_report(result):
@@ -45,7 +81,13 @@ def extract_community_report(result):
             "rating_explanation": result["rating_explanation"],
         }, True
     else:
-        return {}, False
+        return {
+            "title": None,
+            "summary": None,
+            "findings": None,
+            "rating": None,
+            "rating_explanation": None,
+        }, False
 
 
 def dict_has_keys_with_types(d, keys_with_types):
@@ -82,7 +124,7 @@ def generate_community_report(community_text, args, community_id, max_generate=3
 
     if success is False:
         print(f"Failed to generate community report for community:{community_id}")
-        return None, None
+        return None, extract_result
 
     return raw_result, extract_result
 
@@ -98,8 +140,11 @@ def community_report_embedding(community_report, args):
 def community_report(results_by_level, args, final_entities, final_relationships):
     results_community = []
     for level, communities in results_by_level.items():
-        print(f"Create community report for level: {level}")
+        print(f"Create community report for level: {level} ")
+        print(f"Number of communities in this level: {len(communities)}")
         for community_id, node_list in communities.items():
+            # if community_id != "9":
+            #     continue
             print(f"Community {community_id}:")
             # print(f"Nodes:{node_list}")
             community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
@@ -107,7 +152,7 @@ def community_report(results_by_level, args, final_entities, final_relationships
                 final_relationships["source"].isin(node_list)
             ]
             community_text = prep_community_report_context(
-                0, community_nodes, community_relationships
+                0, community_nodes, community_relationships, max_tokens=args.max_tokens
             )
 
             raw_result, community_report = generate_community_report(
@@ -121,7 +166,13 @@ def community_report(results_by_level, args, final_entities, final_relationships
             community_report["raw_result"] = raw_result
 
             if raw_result is None or community_report is None:
-                community_report["embedding"] = None
+                # use the community text as the embedding alternatively
+                community_report["embedding"] = openai_embedding(
+                    community_text,
+                    args.embedding_api_key,
+                    args.embedding_api_base,
+                    args.embedding_model,
+                )
             else:
                 community_report["embedding"] = community_report_embedding(
                     community_report, args
