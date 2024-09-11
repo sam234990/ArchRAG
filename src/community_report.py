@@ -183,6 +183,75 @@ def community_report(results_by_level, args, final_entities, final_relationships
     return community_df
 
 
+def confirm_community_result(results_by_level):
+    levels = sorted(
+        results_by_level.keys(), reverse=True
+    )  # Start from the highest level
+    lower_to_higher_assignments = (
+        {}
+    )  # To track the assignment of lower-level communities
+
+    for i in range(len(levels) - 1):  # Compare each level with the next lower level
+        higher_level = levels[i]
+        lower_level = levels[i + 1]
+        print(f"Checking level {higher_level} against level {lower_level}...")
+
+        higher_level_communities = results_by_level[higher_level]
+        lower_level_communities = results_by_level[lower_level]
+
+        # Track which lower-level communities have already been assigned to a higher-level community
+        lower_community_to_higher = {}
+        for higher_community_id, higher_node_list in higher_level_communities.items():
+            higher_node_set = set(higher_node_list)
+
+            # Check each node in the higher-level community against the lower-level communities
+            for lower_community_id, lower_node_list in lower_level_communities.items():
+                lower_node_set = set(lower_node_list)
+
+                # If any nodes from the lower-level community are in the higher-level community
+                if higher_node_set.intersection(lower_node_set):
+                    if lower_community_id in lower_community_to_higher:
+                        # If this lower-level community is already assigned to a different higher-level community
+                        assigned_higher_community = lower_community_to_higher[
+                            lower_community_id
+                        ]
+                        if assigned_higher_community != higher_community_id:
+                            print(
+                                f"Error: Lower-level community {lower_community_id} is part of both "
+                                f"higher-level community {higher_community_id} and {assigned_higher_community}!"
+                            )
+                    else:
+                        # Assign this lower-level community to the current higher-level community
+                        lower_community_to_higher[lower_community_id] = (
+                            higher_community_id
+                        )
+
+                        # Store the assignment in the tracking dictionary
+                        if lower_community_id not in lower_to_higher_assignments:
+                            lower_to_higher_assignments[lower_community_id] = []
+                        lower_to_higher_assignments[lower_community_id].append(
+                            higher_community_id
+                        )
+
+        print(f"Finished checking level {higher_level} against level {lower_level}.\n")
+
+    # Output the assignment results
+    print("Assignment of lower-level communities to higher-level communities:")
+    for lower_community_id, higher_communities in lower_to_higher_assignments.items():
+        print(
+            f"Lower-level community {lower_community_id} is assigned to higher-level communities: {higher_communities}"
+        )
+
+        # Optionally, output the contents (nodes) of the assigned communities
+        for higher_level in higher_communities:
+            print(
+                f"  Higher-level community {higher_level} content: {results_by_level[levels[i]][higher_level]}"
+            )
+        print()
+
+    print("Finished checking all levels.")
+
+
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
@@ -190,8 +259,12 @@ if __name__ == "__main__":
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     cos_graph = compute_distance(graph=graph)
     results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
-    community_df = community_report(
-        results_by_level, args, final_entities, final_relationships
-    )
-    output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"
-    community_df.to_csv(output_path, index=False)
+
+    confirm_community_result(results_by_level)
+
+    # community_df = community_report(
+    # results_by_level, args, final_entities, final_relationships
+    # )
+
+    # output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"
+    # community_df.to_csv(output_path, index=False)
