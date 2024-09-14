@@ -74,14 +74,27 @@ conda-forge package "feedstock".
 
 ```shell
 # step 1
-$ cmake -B build . -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=ON
+# for Debug
+$ cmake -B build . -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=ON -DCMAKE_BUILD_TYPE=Debug
+# for release
+$ cmake -B build . -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_PYTHON=ON 
 
 # step 2
 $ make -C build -j faiss
 
-# step 3
+# step 3 Building the python bindings (optional)
 $ make -C build -j swigfaiss
 $ (cd build/faiss/python && python setup.py install)
+
+# step 4 C++ library and headers
+$ make -C build install
+
+# step 5 test
+# for C++
+$ make -C build test 
+# for Python
+$ (cd build/faiss/python && python setup.py build)
+$ PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest tests/test_*.py
 ```
 
 # Building from source

@@ -606,6 +606,7 @@ void HCHNSW::add_with_locks_level(
     omp_unset_lock(&locks[pt_id]);
 } // namespace faiss
 
+
 /**************************************************************
  * MinimaxHeap
  **************************************************************/
