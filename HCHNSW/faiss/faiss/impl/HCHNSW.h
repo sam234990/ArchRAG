@@ -19,6 +19,8 @@ struct SearchParametersHCHNSW : SearchParameters {
     int efSearch = 16;
     bool check_relative_distance = true;
     bool bounded_queue = true;
+    // this is the level where we search for the nearest neighbors
+    int search_level = -1;
 
     ~SearchParametersHCHNSW() {}
 };
@@ -147,7 +149,7 @@ struct HCHNSW {
     void get_first_entry_points_in_level(
             int level,
             storage_idx_t* entry,
-            storage_idx_t input) ;
+            storage_idx_t input);
 
     void add_links_level_starting_from(
             DistanceComputer& ptdis,
@@ -167,6 +169,11 @@ struct HCHNSW {
             VisitedTable& vt,
             bool keep_max_size_level = false);
 
+    void add_remain_cross_link(
+            DistanceComputer& ptdis,
+            storage_idx_t pt_id,
+            int level,
+            VisitedTable& vt);
 
     // TODO: Implement the following functions
     HCHNSWStats search(
