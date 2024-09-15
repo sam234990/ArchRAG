@@ -23,8 +23,7 @@ namespace faiss {
  * HCHNSW structure implementation
  ********************************************************************/
 
-HCHNSW::HCHNSW(int ML = 0, int M = 32, int CL = 1, int vector_size)
-        : rng(12345) {
+HCHNSW::HCHNSW(int ML, int M, int CL, int vector_size) : rng(12345) {
     max_level = ML;
     // cross_links = CL;
     level_neighbors.resize(max_level + 1);
@@ -34,6 +33,9 @@ HCHNSW::HCHNSW(int ML = 0, int M = 32, int CL = 1, int vector_size)
     }
 
     // reserve space for some variable for the vectors
+    if (vector_size <= 0) {
+        std::cerr << "Error: vector_size should be greater than 0" << std::endl;
+    }
 
     levels.reserve(vector_size + 1);
     offsets.reserve(vector_size + 1);
@@ -158,7 +160,7 @@ void HCHNSW::shrink_neighbor_list(
         std::priority_queue<NodeDistFarther>& input,
         std::vector<NodeDistFarther>& output,
         int max_size,
-        bool keep_max_size_level0 = false) {
+        bool keep_max_size_level0) {
     // This prevents number of neighbors at
     // level 0 from being shrunk to less than 2 * M.
     // This is essential in making sure
@@ -235,7 +237,7 @@ void add_link(
         storage_idx_t src,
         storage_idx_t dest,
         int level,
-        bool keep_max_size_level0 = false) {
+        bool keep_max_size_level0) {
     size_t begin, end;
     hchnsw.neighbor_range(src, &begin, &end);
     if (hchnsw.neighbors[end - 1] == -1) {
@@ -506,7 +508,7 @@ void HCHNSW::add_links_level_starting_from(
         int level,
         omp_lock_t* locks,
         VisitedTable& vt,
-        bool keep_max_size_level = false) {
+        bool keep_max_size_level) {
     std::priority_queue<NodeDistCloser> link_targets;
 
     search_neighbors_to_add(
@@ -541,7 +543,7 @@ void HCHNSW::add_with_locks_level(
         int pt_id,
         std::vector<omp_lock_t>& locks,
         VisitedTable& vt,
-        bool keep_max_size_level = false) {
+        bool keep_max_size_level) {
     //  greedy search on upper levels
 
     storage_idx_t nearest;
@@ -964,7 +966,7 @@ HCHNSWStats HCHNSW::search(
         DistanceComputer& qdis,
         ResultHandler<C>& res,
         VisitedTable& vt,
-        const SearchParametersHCHNSW* params = nullptr) const {
+        const SearchParametersHCHNSW* params) const {
     HCHNSWStats stats;
     if (first_entry_points_in_level[max_level] == -1) {
         return stats;
@@ -1040,7 +1042,7 @@ void HCHNSW::search_level_n(
         int search_type,
         HCHNSWStats& search_stats,
         VisitedTable& vt,
-        const SearchParametersHCHNSW* params = nullptr) const {
+        const SearchParametersHCHNSW* params) const {
     const HCHNSW& hchnsw = *this;
     auto efSearch = params ? params->efSearch : hchnsw.efSearch;
     int k = extract_k_from_ResultHandler(res);

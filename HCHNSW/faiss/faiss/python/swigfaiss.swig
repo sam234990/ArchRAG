@@ -97,6 +97,7 @@ typedef uint64_t size_t;
 #include <faiss/IndexShardsIVF.h>
 #include <faiss/IndexReplicas.h>
 #include <faiss/impl/HNSW.h>
+#include <faiss/impl/HCHNSW.h>
 #include <faiss/IndexHNSW.h>
 #include <faiss/IndexHCHNSW.h>
 
@@ -528,6 +529,7 @@ void gpu_sync_all_devices()
 %include  <faiss/IndexIVFSpectralHash.h>
 %include  <faiss/IndexIVFAdditiveQuantizer.h>
 %include  <faiss/impl/HNSW.h>
+%include  <faiss/impl/HCHNSW.h>
 %include  <faiss/IndexHNSW.h>
 %include  <faiss/IndexHCHNSW.h>
 
@@ -772,7 +774,6 @@ struct faiss::simd16uint16 {};
     DOWNCAST ( IndexHCHNSWPQ )
     DOWNCAST ( IndexHCHNSWSQ )
     DOWNCAST ( IndexHCHNSW )
-    DOWNCAST ( IndexHCHNSW2Level )
     DOWNCAST ( IndexNNDescentFlat )
     DOWNCAST ( IndexNSGFlat )
     DOWNCAST ( IndexNSGPQ )

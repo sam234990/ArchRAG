@@ -15,6 +15,12 @@
 
 namespace faiss {
 
+struct VisitedTable;
+struct DistanceComputer; // from AuxIndexStructures
+struct HCHNSWStats;
+template <class C>
+struct ResultHandler;
+
 struct SearchParametersHCHNSW : SearchParameters {
     int efSearch = 16;
     bool check_relative_distance = true;
@@ -135,7 +141,7 @@ struct HCHNSW {
 
     void neighbor_range(idx_t no, size_t* begin, size_t* end) const;
 
-    explicit HCHNSW(int ML = 0, int M = 32, int CL = 1, int vector_size);
+    explicit HCHNSW(int ML = 0, int M = 32, int CL = 1, int vector_size = 0);
 
     void add_leiden_hier_links_sequentially(
             idx_t no,
