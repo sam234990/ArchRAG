@@ -72,6 +72,14 @@ void HCHNSW::add_leiden_hier_links_sequentially(
         idx_t no,
         const storage_idx_t* neighbors,
         size_t n) {
+    int no_level = levels[no];
+    for (size_t i = 0; i < n; i++) {
+        int neighbor_level = levels[neighbors[i]];
+        if ((neighbor_level + 1) != no_level) {
+            std::cerr << "Error: neighbor " << neighbors[i]
+                      << " is not the parent of " << no << std::endl;
+        }
+    }
     leiden_hier_neighbor.insert(
             leiden_hier_neighbor.end(), neighbors, neighbors + n);
 

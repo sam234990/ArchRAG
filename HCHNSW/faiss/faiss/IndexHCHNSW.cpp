@@ -37,11 +37,11 @@
 
 namespace faiss {
 
-using MinimaxHeap = HNSW::MinimaxHeap;
-using storage_idx_t = HNSW::storage_idx_t;
-using NodeDistFarther = HNSW::NodeDistFarther;
+using MinimaxHeap = HCHNSW::MinimaxHeap;
+using storage_idx_t = HCHNSW::storage_idx_t;
+using NodeDistFarther = HCHNSW::NodeDistFarther;
 
-HNSWStats hchnsw_stats;
+HCHNSWStats hchnsw_stats;
 
 /**************************************************************
  * add / search blocks of descriptors
@@ -57,31 +57,28 @@ DistanceComputer* storage_distance_computer(const Index* storage) {
     }
 }
 
-void hnsw_add_vertices(
-        IndexHCHNSW& index_hnsw,
+// add new n vector(n, x) to the existing index with ntotoal vectors(n0)
+void hchnsw_add_vertices(
+        IndexHCHNSW& index_hchnsw,
         size_t n0,
         size_t n,
         const float* x,
-        bool verbose,
-        bool preset_levels = false) {
-    size_t d = index_hnsw.d;
-    HNSW& hnsw = index_hnsw.hnsw;
-    HCHNSW& hchnsw = index_hnsw.hchnsw;
+        bool verbose) {
+    size_t d = index_hchnsw.d;
+    HCHNSW& hchnsw = index_hchnsw.hchnsw;
     size_t ntotal = n0 + n;
     double t0 = getmillisecs();
     if (verbose) {
-        printf("hnsw_add_vertices: adding %zd elements on top of %zd "
-               "(preset_levels=%d)\n",
+        printf("hchnsw_add_vertices: adding %zd elements on top of %zd ",
                n,
-               n0,
-               int(preset_levels));
+               n0);
     }
 
     if (n == 0) {
         return;
     }
 
-    int max_level = hnsw.prepare_level_tab(n, preset_levels);
+    int max_level = hchnsw.max_level;
 
     if (verbose) {
         printf("  max_level = %d\n", max_level);
@@ -100,7 +97,7 @@ void hnsw_add_vertices(
         // build histogram
         for (int i = 0; i < n; i++) {
             storage_idx_t pt_id = i + n0;
-            int pt_level = hnsw.levels[pt_id] - 1;
+            int pt_level = hchnsw.levels[pt_id];
             while (pt_level >= hist.size())
                 hist.push_back(0);
             hist[pt_level]++;
@@ -115,22 +112,20 @@ void hnsw_add_vertices(
         // bucket sort
         for (int i = 0; i < n; i++) {
             storage_idx_t pt_id = i + n0;
-            int pt_level = hnsw.levels[pt_id] - 1;
+            int pt_level = hchnsw.levels[pt_id];
             order[offsets[pt_level]++] = pt_id;
         }
     }
 
     idx_t check_period = InterruptCallback::get_period_hint(
-            max_level * index_hnsw.d * hnsw.efConstruction);
+            max_level * index_hchnsw.d * hchnsw.efConstruction);
 
     { // perform add
         RandomGenerator rng2(789);
 
         int i1 = n;
 
-        for (int pt_level = hist.size() - 1;
-             pt_level >= !index_hnsw.init_level0;
-             pt_level--) {
+        for (int pt_level = hist.size() - 1; pt_level >= 0; pt_level--) {
             int i0 = i1 - hist[pt_level];
 
             if (verbose) {
@@ -148,7 +143,7 @@ void hnsw_add_vertices(
                 VisitedTable vt(ntotal);
 
                 std::unique_ptr<DistanceComputer> dis(
-                        storage_distance_computer(index_hnsw.storage));
+                        storage_distance_computer(index_hchnsw.storage));
                 int prev_display =
                         verbose && omp_get_thread_num() == 0 ? 0 : -1;
                 size_t counter = 0;
@@ -166,13 +161,13 @@ void hnsw_add_vertices(
                         continue;
                     }
 
-                    hnsw.add_with_locks(
+                    hchnsw.add_with_locks_level(
                             *dis,
                             pt_level,
                             pt_id,
                             locks,
                             vt,
-                            index_hnsw.keep_max_size_level0 && (pt_level == 0));
+                            index_hchnsw.keep_max_size_level);
 
                     if (prev_display >= 0 && i - i0 > prev_display + 10000) {
                         prev_display = i - i0;
@@ -192,7 +187,7 @@ void hnsw_add_vertices(
             }
             i1 = i0;
         }
-        if (index_hnsw.init_level0) {
+        if (index_hchnsw.init_level0) {
             FAISS_ASSERT(i1 == 0);
         } else {
             FAISS_ASSERT((i1 - hist[0]) == 0);
@@ -237,7 +232,7 @@ void IndexHCHNSW::train(idx_t n, const float* x) {
     FAISS_THROW_IF_NOT_MSG(
             storage,
             "Please use IndexHCHNSWFlat (or variants) instead of IndexHCHNSW directly");
-    // hnsw structure does not require training
+    // hchnsw structure does not require training
     storage->train(n, x);
     is_trained = true;
 }
@@ -245,7 +240,7 @@ void IndexHCHNSW::train(idx_t n, const float* x) {
 namespace {
 
 template <class BlockResultHandler>
-void hnsw_search(
+void hchnsw_search(
         const IndexHCHNSW* index,
         idx_t n,
         const float* x,
@@ -255,19 +250,26 @@ void hnsw_search(
             index->storage,
             "No storage index, please use IndexHCHNSWFlat (or variants) "
             "instead of IndexHCHNSW directly");
-    const SearchParametersHNSW* params = nullptr;
-    const HNSW& hnsw = index->hnsw;
+    const SearchParametersHCHNSW* params = nullptr;
+    const HCHNSW& hchnsw = index->hchnsw;
 
-    int efSearch = hnsw.efSearch;
+    int efSearch = hchnsw.efSearch;
+    int search_level = -1;
     if (params_in) {
-        params = dynamic_cast<const SearchParametersHNSW*>(params_in);
+        params = dynamic_cast<const SearchParametersHCHNSW*>(params_in);
         FAISS_THROW_IF_NOT_MSG(params, "params type invalid");
         efSearch = params->efSearch;
+        search_level = params->search_level;
+    }
+    if (search_level == -1) {
+        std::cerr << "search_level is not set, using default value 0"
+                  << std::endl;
+        search_level = 0;
     }
     size_t n1 = 0, n2 = 0, ndis = 0, nhops = 0;
 
     idx_t check_period = InterruptCallback::get_period_hint(
-            hnsw.max_level * index->d * efSearch);
+            hchnsw.max_level * index->d * efSearch);
 
     for (idx_t i0 = 0; i0 < n; i0 += check_period) {
         idx_t i1 = std::min(i0 + check_period, n);
@@ -285,7 +287,7 @@ void hnsw_search(
                 res.begin(i);
                 dis->set_query(x + i * index->d);
 
-                HNSWStats stats = hnsw.search(*dis, res, vt, params);
+                HCHNSWStats stats = hchnsw.search(*dis,res,vt, params);
                 n1 += stats.n1;
                 n2 += stats.n2;
                 ndis += stats.ndis;
@@ -310,10 +312,10 @@ void IndexHCHNSW::search(
         const SearchParameters* params_in) const {
     FAISS_THROW_IF_NOT(k > 0);
 
-    using RH = HeapBlockResultHandler<HNSW::C>;
+    using RH = HeapBlockResultHandler<HCHNSW::C>;
     RH bres(n, distances, labels, k);
 
-    hnsw_search(this, n, x, bres, params_in);
+    hchnsw_search(this, n, x, bres, params_in);
 
     if (is_similarity_metric(this->metric_type)) {
         // we need to revert the negated distances
@@ -329,10 +331,10 @@ void IndexHCHNSW::range_search(
         float radius,
         RangeSearchResult* result,
         const SearchParameters* params) const {
-    using RH = RangeSearchBlockResultHandler<HNSW::C>;
+    using RH = RangeSearchBlockResultHandler<HCHNSW::C>;
     RH bres(result, is_similarity_metric(metric_type) ? -radius : radius);
 
-    hnsw_search(this, n, x, bres, params);
+    hchnsw_search(this, n, x, bres, params);
 
     if (is_similarity_metric(this->metric_type)) {
         // we need to revert the negated distances
@@ -342,6 +344,7 @@ void IndexHCHNSW::range_search(
     }
 }
 
+// add new n vector to the existing index with ntotoal vectors
 void IndexHCHNSW::add(idx_t n, const float* x) {
     FAISS_THROW_IF_NOT_MSG(
             storage,
@@ -351,7 +354,7 @@ void IndexHCHNSW::add(idx_t n, const float* x) {
     storage->add(n, x);
     ntotal = storage->ntotal;
 
-    hnsw_add_vertices(*this, n0, n, x, verbose, hnsw.levels.size() == ntotal);
+    hchnsw_add_vertices(*this, n0, n, x, verbose);
 }
 
 void IndexHCHNSW::construct_leiden_edge(
@@ -367,6 +370,16 @@ void IndexHCHNSW::construct_leiden_edge(
                 i, neighbor, number_of_neighbors);
     }
 };
+
+void IndexHCHNSW::set_vector_level(const std::vector<int>& level) {
+    if (hchnsw.levels.size() < level.size()) {
+        std::cerr << "level size is larger than the current size of levels"
+                  << std::endl;
+    }
+    for (int i = 0; i < level.size(); i++) {
+        hchnsw.levels[i] = level[i];
+    }
+}
 
 void IndexHCHNSW::reset() {
     hchnsw.reset();
@@ -387,28 +400,26 @@ void IndexHCHNSW::shrink_level_0_neighbors(int new_size) {
 #pragma omp for
         for (idx_t i = 0; i < ntotal; i++) {
             size_t begin, end;
-            hnsw.neighbor_range(i, 0, &begin, &end);
+            hchnsw.neighbor_range(i, &begin, &end);
 
             std::priority_queue<NodeDistFarther> initial_list;
 
             for (size_t j = begin; j < end; j++) {
-                int v1 = hnsw.neighbors[j];
+                int v1 = hchnsw.neighbors[j];
                 if (v1 < 0)
                     break;
                 initial_list.emplace(dis->symmetric_dis(i, v1), v1);
-
-                // initial_list.emplace(qdis(v1), v1);
             }
 
             std::vector<NodeDistFarther> shrunk_list;
-            HNSW::shrink_neighbor_list(
+            HCHNSW::shrink_neighbor_list(
                     *dis, initial_list, shrunk_list, new_size);
 
             for (size_t j = begin; j < end; j++) {
                 if (j - begin < shrunk_list.size())
-                    hnsw.neighbors[j] = shrunk_list[j - begin].id;
+                    hchnsw.neighbors[j] = shrunk_list[j - begin].id;
                 else
-                    hnsw.neighbors[j] = -1;
+                    hchnsw.neighbors[j] = -1;
             }
         }
     }

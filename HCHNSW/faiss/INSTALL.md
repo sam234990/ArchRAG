@@ -95,6 +95,10 @@ $ make -C build test
 # for Python
 $ (cd build/faiss/python && python setup.py build)
 $ PYTHONPATH="$(ls -d ./build/faiss/python/build/lib*/)" pytest tests/test_*.py
+
+#step demo debug
+$ make -C build demo_ivfpq_indexing
+$ ./build/demos/demo_ivfpq_indexing
 ```
 
 # Building from source

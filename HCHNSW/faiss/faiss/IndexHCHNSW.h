@@ -15,7 +15,6 @@
 #include <faiss/IndexPQ.h>
 #include <faiss/IndexScalarQuantizer.h>
 #include <faiss/impl/HCHNSW.h>
-#include <faiss/impl/HNSW.h>
 #include <faiss/utils/utils.h>
 
 namespace faiss {
@@ -31,7 +30,6 @@ struct IndexHCHNSW : Index {
     typedef HCHNSW::storage_idx_t storage_idx_t;
 
     // the link structure
-    HNSW hnsw;
     HCHNSW hchnsw;
 
     // the sequential storage
@@ -48,7 +46,7 @@ struct IndexHCHNSW : Index {
     // to the maximum size allowed (2 * M). This option is used by
     // IndexHHNSWCagra to create a full base layer graph that is
     // used when GpuIndexCagra::copyFrom(IndexHCHNSWCagra*) is invoked.
-    bool keep_max_size_level0 = false;
+    bool keep_max_size_level = false;
 
     explicit IndexHCHNSW(
             int d = 0,
@@ -61,7 +59,6 @@ struct IndexHCHNSW : Index {
 
     ~IndexHCHNSW() override;
 
-// TODO
     void add(idx_t n, const float* x) override;
 
     void construct_leiden_edge(
@@ -69,10 +66,11 @@ struct IndexHCHNSW : Index {
             const storage_idx_t* edges,
             size_t nedge);
 
+    void set_vector_level(const std::vector<int>& level);
+
     /// Trains the storage if needed
     void train(idx_t n, const float* x) override;
 
-// TODO
     /// entry point for search
     void search(
             idx_t n,
@@ -81,7 +79,7 @@ struct IndexHCHNSW : Index {
             float* distances,
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
-// TODO
+
     void range_search(
             idx_t n,
             const float* x,
@@ -89,13 +87,10 @@ struct IndexHCHNSW : Index {
             RangeSearchResult* result,
             const SearchParameters* params = nullptr) const override;
 
-
-// TODO
     void reconstruct(idx_t key, float* recons) const override;
 
     void reset() override;
 
-// TODO
     void shrink_level_0_neighbors(int size);
 
     DistanceComputer* get_distance_computer() const override;
