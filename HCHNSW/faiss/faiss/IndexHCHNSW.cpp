@@ -185,6 +185,21 @@ void hchnsw_add_vertices(
             if (interrupt) {
                 FAISS_THROW_MSG("computation interrupted");
             }
+
+            // check the cross links in pt_level+1 after add in pt_level
+            // i1-- the start of the pt+1 level and the end of the pt_level
+            if (pt_level != (hist.size() - 1)) {
+                int start = i1;
+                int end = i1 + hist[pt_level + 1];
+                std::unique_ptr<DistanceComputer> dis(
+                        storage_distance_computer(index_hchnsw.storage));
+                for (int i = start; i < end; i++) {
+                    storage_idx_t pt_id = order[i];
+                    dis->set_query(x + (pt_id - n0) * d);
+                    hchnsw.add_remain_cross_link(*dis, pt_id, pt_level + 1);
+                }
+            }
+
             i1 = i0;
         }
         if (index_hchnsw.init_level0) {
@@ -217,9 +232,9 @@ IndexHCHNSW::IndexHCHNSW(
         MetricType metric)
         : Index(d, metric), hchnsw(ML, M, CL, vector_size) {}
 
-IndexHCHNSW::IndexHCHNSW(Index* storage, int ML, int M, int CL)
+IndexHCHNSW::IndexHCHNSW(Index* storage, int ML, int M, int CL, int vector_size)
         : Index(storage->d, storage->metric_type),
-          hchnsw(ML, M, CL, storage->ntotal),
+          hchnsw(ML, M, CL, vector_size),
           storage(storage) {}
 
 IndexHCHNSW::~IndexHCHNSW() {
@@ -274,7 +289,7 @@ void hchnsw_search(
     for (idx_t i0 = 0; i0 < n; i0 += check_period) {
         idx_t i1 = std::min(i0 + check_period, n);
 
-#pragma omp parallel if (i1 - i0 > 1)
+// #pragma omp parallel if (i1 - i0 > 1)
         {
             VisitedTable vt(index->ntotal);
             typename BlockResultHandler::SingleResultHandler res(bres);
@@ -282,12 +297,12 @@ void hchnsw_search(
             std::unique_ptr<DistanceComputer> dis(
                     storage_distance_computer(index->storage));
 
-#pragma omp for reduction(+ : n1, n2, ndis, nhops) schedule(guided)
+// #pragma omp for reduction(+ : n1, n2, ndis, nhops) schedule(guided)
             for (idx_t i = i0; i < i1; i++) {
                 res.begin(i);
                 dis->set_query(x + i * index->d);
 
-                HCHNSWStats stats = hchnsw.search(*dis,res,vt, params);
+                HCHNSWStats stats = hchnsw.search(*dis, res, vt, params);
                 n1 += stats.n1;
                 n2 += stats.n2;
                 ndis += stats.ndis;
@@ -373,8 +388,7 @@ void IndexHCHNSW::construct_leiden_edge(
 
 void IndexHCHNSW::set_vector_level(const std::vector<int>& level) {
     if (hchnsw.levels.size() < level.size()) {
-        std::cerr << "level size is larger than the current size of levels"
-                  << std::endl;
+        hchnsw.levels.resize(level.size());
     }
     for (int i = 0; i < level.size(); i++) {
         hchnsw.levels[i] = level[i];
@@ -437,11 +451,20 @@ IndexHCHNSWFlat::IndexHCHNSWFlat() {
     is_trained = true;
 }
 
-IndexHCHNSWFlat::IndexHCHNSWFlat(int d, int M, MetricType metric)
+IndexHCHNSWFlat::IndexHCHNSWFlat(
+        int d,
+        int ML,
+        int M,
+        int CL,
+        int vector_size,
+        MetricType metric)
         : IndexHCHNSW(
                   (metric == METRIC_L2) ? new IndexFlatL2(d)
                                         : new IndexFlat(d, metric),
-                  M) {
+                  ML,
+                  M,
+                  CL,
+                  vector_size) {
     own_fields = true;
     is_trained = true;
 }
@@ -454,11 +477,19 @@ IndexHCHNSWPQ::IndexHCHNSWPQ() = default;
 
 IndexHCHNSWPQ::IndexHCHNSWPQ(
         int d,
-        int pq_m,
+        int ML,
         int M,
+        int CL,
+        int vector_size,
+        int pq_m,
         int pq_nbits,
         MetricType metric)
-        : IndexHCHNSW(new IndexPQ(d, pq_m, pq_nbits, metric), M) {
+        : IndexHCHNSW(
+                  new IndexPQ(d, pq_m, pq_nbits, metric),
+                  ML,
+                  M,
+                  CL,
+                  vector_size) {
     own_fields = true;
     is_trained = false;
 }
@@ -474,10 +505,18 @@ void IndexHCHNSWPQ::train(idx_t n, const float* x) {
 
 IndexHCHNSWSQ::IndexHCHNSWSQ(
         int d,
-        ScalarQuantizer::QuantizerType qtype,
+        int ML,
         int M,
+        int CL,
+        int vector_size,
+        ScalarQuantizer::QuantizerType qtype,
         MetricType metric)
-        : IndexHCHNSW(new IndexScalarQuantizer(d, qtype, metric), M) {
+        : IndexHCHNSW(
+                  new IndexScalarQuantizer(d, qtype, metric),
+                  ML,
+                  M,
+                  CL,
+                  vector_size) {
     is_trained = this->storage->is_trained;
     own_fields = true;
 }

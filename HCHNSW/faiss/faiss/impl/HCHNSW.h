@@ -145,7 +145,7 @@ struct HCHNSW {
 
     void add_leiden_hier_links_sequentially(
             idx_t no,
-            const storage_idx_t* neighbors,
+            const storage_idx_t* leiden_neighbors,
             size_t n);
 
     void get_level(idx_t no, int* level) const;
@@ -165,7 +165,7 @@ struct HCHNSW {
             int level,
             omp_lock_t* locks,
             VisitedTable& vt,
-            bool keep_max_size_level = false);
+            bool keep_max_size_level = true);
 
     void add_with_locks_level(
             DistanceComputer& ptdis,
@@ -173,13 +173,12 @@ struct HCHNSW {
             int pt_id,
             std::vector<omp_lock_t>& locks,
             VisitedTable& vt,
-            bool keep_max_size_level = false);
+            bool keep_max_size_level = true);
 
     void add_remain_cross_link(
             DistanceComputer& ptdis,
             storage_idx_t pt_id,
-            int level,
-            VisitedTable& vt);
+            int level);
 
     // TODO: Implement the following functions
     HCHNSWStats search(

@@ -40,7 +40,11 @@ HCHNSW::HCHNSW(int ML, int M, int CL, int vector_size) : rng(12345) {
     levels.reserve(vector_size + 1);
     offsets.reserve(vector_size + 1);
     offsets.push_back(0);
-    neighbors.reserve(vector_size * M * 2);
+    for (storage_idx_t i = 0; i < vector_size; i++) {
+        int number_neighbor = level_neighbors[levels[i]];
+        offsets.push_back(offsets[i] + number_neighbor);
+    }
+    neighbors.resize(offsets.back(), -1);
 
     leiden_hier_offset.reserve(vector_size);
     leiden_hier_offset.push_back(0);
@@ -48,17 +52,15 @@ HCHNSW::HCHNSW(int ML, int M, int CL, int vector_size) : rng(12345) {
 
     // cross_offsets.reserve(vector_size);
     // cross_offsets.push_back(0);
-    cross_neighbors = std::vector<storage_idx_t>(M, -1);
+    cross_neighbors = std::vector<storage_idx_t>(vector_size, -1);
 
     first_entry_points_in_level.resize(max_level + 1, -1);
 }
 
 void HCHNSW::set_nb_neighbors(int level_no, int n_number) {
-    if (level_no >= max_level) {
-        max_level = level_no + 1;
-    }
-    if (level_no >= level_neighbors.size()) {
-        level_neighbors.resize(level_no + 1);
+    if (level_no > max_level) {
+        std::cerr << "Error: level_no should be less than max_level"
+                  << std::endl;
     }
     level_neighbors[level_no] = n_number;
 }
@@ -70,18 +72,18 @@ void HCHNSW::neighbor_range(idx_t no, size_t* begin, size_t* end) const {
 
 void HCHNSW::add_leiden_hier_links_sequentially(
         idx_t no,
-        const storage_idx_t* neighbors,
+        const storage_idx_t* leiden_neighbors,
         size_t n) {
     int no_level = levels[no];
     for (size_t i = 0; i < n; i++) {
-        int neighbor_level = levels[neighbors[i]];
+        int neighbor_level = levels[leiden_neighbors[i]];
         if ((neighbor_level + 1) != no_level) {
-            std::cerr << "Error: neighbor " << neighbors[i]
+            std::cerr << "Error: neighbor " << leiden_neighbors[i]
                       << " is not the parent of " << no << std::endl;
         }
     }
     leiden_hier_neighbor.insert(
-            leiden_hier_neighbor.end(), neighbors, neighbors + n);
+            leiden_hier_neighbor.end(), leiden_neighbors, leiden_neighbors + n);
 
     int next_offset = leiden_hier_neighbor.size();
     leiden_hier_offset.push_back(next_offset);
@@ -102,12 +104,11 @@ void HCHNSW::get_max_level_random_entry(idx_t* entry) {
         *entry = first_entry_points_in_level[max_level];
         return;
     } else {
+        // TODO: error with none vector initial
         std::vector<storage_idx_t> max_level_vector;
         max_level_vector.reserve(levels.size());
         for (storage_idx_t i = 0; i < levels.size(); i++) {
-            int level = -1;
-            get_level(i, &level);
-            if (level == max_level)
+            if (levels[i] == max_level)
                 max_level_vector.push_back(i);
         }
         int random_index = rng.rand_int(max_level_vector.size());
@@ -629,8 +630,7 @@ void HCHNSW::add_with_locks_level(
 void HCHNSW::add_remain_cross_link(
         DistanceComputer& ptdis,
         storage_idx_t pt_id,
-        int level,
-        VisitedTable& vt) {
+        int level) {
     if (cross_neighbors[pt_id] != -1) {
         // the cross neighbor of this vector is already set
         return;

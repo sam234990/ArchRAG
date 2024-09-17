@@ -22,6 +22,9 @@ target_link_libraries(5-Multiple-GPUs PRIVATE faiss)
 add_executable(6-HNSW EXCLUDE_FROM_ALL 6-HNSW.cpp)
 target_link_libraries(6-HNSW PRIVATE faiss)
 
+add_executable(6-2-HCHNSW EXCLUDE_FROM_ALL 6-2-HCHNSW.cpp)
+target_link_libraries(6-2-HCHNSW PRIVATE faiss)
+
 add_executable(7-PQFastScan EXCLUDE_FROM_ALL 7-PQFastScan.cpp)
 target_link_libraries(7-PQFastScan PRIVATE faiss)
 

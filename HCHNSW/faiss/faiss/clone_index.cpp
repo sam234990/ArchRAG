@@ -20,6 +20,7 @@
 #include <faiss/IndexBinary.h>
 #include <faiss/IndexBinaryFlat.h>
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHCHNSW.h>
 #include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVF.h>
 #include <faiss/IndexIVFAdditiveQuantizerFastScan.h>
@@ -128,6 +129,15 @@ IndexHNSW* clone_IndexHNSW(const IndexHNSW* ihnsw) {
     TRYCLONE(IndexHNSWSQ, ihnsw)
     TRYCLONE(IndexHNSW, ihnsw) {
         FAISS_THROW_MSG("clone not supported for this type of IndexHNSW");
+    }
+}
+
+IndexHCHNSW* clone_IndexHCHNSW(const IndexHCHNSW* ihchnsw) {
+    TRYCLONE(IndexHCHNSWFlat, ihchnsw)
+    TRYCLONE(IndexHCHNSWPQ, ihchnsw)
+    TRYCLONE(IndexHCHNSWSQ, ihchnsw)
+    TRYCLONE(IndexHCHNSW, ihchnsw) {
+        FAISS_THROW_MSG("clone not supported for this type of IndexHCHNSW");
     }
 }
 
@@ -318,6 +328,14 @@ Index* Cloner::clone_Index(const Index* index) {
         res->own_fields = true;
         // make sure we don't get a GPU index here
         res->storage = Cloner::clone_Index(ihnsw->storage);
+        return res;
+    } else if (
+            const IndexHCHNSW* ihchnsw =
+                    dynamic_cast<const IndexHCHNSW*>(index)) {
+        IndexHCHNSW* res = clone_IndexHCHNSW(ihchnsw);
+        res->own_fields = true;
+        // make sure we don't get a GPU index here
+        res->storage = Cloner::clone_Index(ihchnsw->storage);
         return res;
     } else if (const IndexNSG* insg = dynamic_cast<const IndexNSG*>(index)) {
         IndexNSG* res = clone_IndexNSG(insg);

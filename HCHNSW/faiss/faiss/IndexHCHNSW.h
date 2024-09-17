@@ -46,7 +46,7 @@ struct IndexHCHNSW : Index {
     // to the maximum size allowed (2 * M). This option is used by
     // IndexHHNSWCagra to create a full base layer graph that is
     // used when GpuIndexCagra::copyFrom(IndexHCHNSWCagra*) is invoked.
-    bool keep_max_size_level = false;
+    bool keep_max_size_level = true;
 
     explicit IndexHCHNSW(
             int d = 0,
@@ -55,7 +55,12 @@ struct IndexHCHNSW : Index {
             int CL = 1,
             int vector_size = 0,
             MetricType metric = METRIC_L2);
-    explicit IndexHCHNSW(Index* storage, int ML, int M = 32, int CL = 1);
+    explicit IndexHCHNSW(
+            Index* storage,
+            int ML,
+            int M = 32,
+            int CL = 1,
+            int vector_size = 0);
 
     ~IndexHCHNSW() override;
 
@@ -96,13 +101,30 @@ struct IndexHCHNSW : Index {
     DistanceComputer* get_distance_computer() const override;
 };
 
+/*
+explicit IndexHCHNSW(
+            int d = 0,
+            int ML = 0,
+            int M = 32,
+            int CL = 1,
+            int vector_size = 0,
+            MetricType metric = METRIC_L2);
+    explicit IndexHCHNSW(Index* storage, int ML, int M = 32, int CL = 1);
+    */
+
 /** Flat index topped with with a HNSW structure to access elements
  *  more efficiently.
  */
 
 struct IndexHCHNSWFlat : IndexHCHNSW {
     IndexHCHNSWFlat();
-    IndexHCHNSWFlat(int d, int M, MetricType metric = METRIC_L2);
+    IndexHCHNSWFlat(
+            int d = 0,
+            int ML = 0,
+            int M = 32,
+            int CL = 1,
+            int vector_size = 0,
+            MetricType metric = METRIC_L2);
 };
 
 /** PQ index topped with with a HNSW structure to access elements
@@ -112,8 +134,11 @@ struct IndexHCHNSWPQ : IndexHCHNSW {
     IndexHCHNSWPQ();
     IndexHCHNSWPQ(
             int d,
-            int pq_m,
+            int ML,
             int M,
+            int CL,
+            int vector_size,
+            int pq_m,
             int pq_nbits = 8,
             MetricType metric = METRIC_L2);
     void train(idx_t n, const float* x) override;
@@ -126,8 +151,11 @@ struct IndexHCHNSWSQ : IndexHCHNSW {
     IndexHCHNSWSQ();
     IndexHCHNSWSQ(
             int d,
-            ScalarQuantizer::QuantizerType qtype,
+            int ML,
             int M,
+            int CL,
+            int vector_size,
+            ScalarQuantizer::QuantizerType qtype,
             MetricType metric = METRIC_L2);
 };
 
