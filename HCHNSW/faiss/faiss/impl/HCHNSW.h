@@ -115,6 +115,7 @@ struct HCHNSW {
 
     faiss::RandomGenerator rng;
 
+    int vector_size = -1;
     /// maximum level
     int max_level = -1;
 
@@ -142,6 +143,9 @@ struct HCHNSW {
     void neighbor_range(idx_t no, size_t* begin, size_t* end) const;
 
     explicit HCHNSW(int ML = 0, int M = 32, int CL = 1, int vector_size = 0);
+
+    // void set_level(int n, const int* level);
+    void set_level(size_t size, const idx_t* level);
 
     void add_leiden_hier_links_sequentially(
             idx_t no,

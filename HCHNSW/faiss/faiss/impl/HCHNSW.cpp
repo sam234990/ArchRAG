@@ -1,4 +1,3 @@
-
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/DistanceComputer.h>
 #include <faiss/impl/HCHNSW.h>
@@ -23,7 +22,7 @@ namespace faiss {
  * HCHNSW structure implementation
  ********************************************************************/
 
-HCHNSW::HCHNSW(int ML, int M, int CL, int vector_size) : rng(12345) {
+HCHNSW::HCHNSW(int ML, int M, int CL, int VS) : rng(12345) {
     max_level = ML;
     // cross_links = CL;
     level_neighbors.resize(max_level + 1);
@@ -33,26 +32,20 @@ HCHNSW::HCHNSW(int ML, int M, int CL, int vector_size) : rng(12345) {
     }
 
     // reserve space for some variable for the vectors
-    if (vector_size <= 0) {
+    if (VS <= 0) {
         std::cerr << "Error: vector_size should be greater than 0" << std::endl;
     }
+    vector_size = VS;
+    levels.reserve(VS + 1);
+    offsets.reserve(VS + 1);
 
-    levels.reserve(vector_size + 1);
-    offsets.reserve(vector_size + 1);
-    offsets.push_back(0);
-    for (storage_idx_t i = 0; i < vector_size; i++) {
-        int number_neighbor = level_neighbors[levels[i]];
-        offsets.push_back(offsets[i] + number_neighbor);
-    }
-    neighbors.resize(offsets.back(), -1);
-
-    leiden_hier_offset.reserve(vector_size);
+    leiden_hier_offset.reserve(VS);
     leiden_hier_offset.push_back(0);
-    leiden_hier_neighbor.reserve(vector_size + 1);
+    leiden_hier_neighbor.reserve(VS + 1);
 
     // cross_offsets.reserve(vector_size);
     // cross_offsets.push_back(0);
-    cross_neighbors = std::vector<storage_idx_t>(vector_size, -1);
+    cross_neighbors = std::vector<storage_idx_t>(VS, -1);
 
     first_entry_points_in_level.resize(max_level + 1, -1);
 }
@@ -69,6 +62,23 @@ void HCHNSW::neighbor_range(idx_t no, size_t* begin, size_t* end) const {
     *begin = offsets[no];
     *end = offsets[no + 1];
 }
+
+void HCHNSW::set_level(size_t size, const idx_t* level) {
+    if (levels.size() < size) {
+        levels.resize(size);
+    }
+    std::copy(level, level + size, levels.begin());
+
+    offsets.reserve(size + 1);
+    offsets.push_back(0);
+    // levels initial is zero
+    for (storage_idx_t i = 0; i < size; i++) {
+        int number_neighbor = level_neighbors[levels[i]];
+        offsets.push_back(offsets[i] + number_neighbor);
+    }
+    neighbors.resize(offsets.back(), -1);
+}
+
 
 void HCHNSW::add_leiden_hier_links_sequentially(
         idx_t no,

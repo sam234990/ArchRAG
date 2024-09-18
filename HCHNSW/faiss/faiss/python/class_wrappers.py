@@ -228,6 +228,8 @@ def handle_Index(the_class):
         assert d == self.d
         x = np.ascontiguousarray(x, dtype='float32')
         self.add_c(n, swig_ptr(x))
+        
+    
 
     def replacement_add_with_ids(self, x, ids):
         """Adds vectors with arbitrary ids to the index (not all indexes support this).
@@ -786,6 +788,11 @@ def handle_Index(the_class):
         assert n == self.ntotal
         perm = np.ascontiguousarray(perm, dtype='int64')
         self.permute_entries_c(faiss.swig_ptr(perm))
+        
+    def replacement_set_vector_level(self, level):
+        n, = level.shape
+        level = np.ascontiguousarray(level, dtype='int64')
+        self.set_vector_level_c(n, swig_ptr(level))
 
     replace_method(the_class, 'add', replacement_add)
     replace_method(the_class, 'add_with_ids', replacement_add_with_ids)
@@ -815,6 +822,8 @@ def handle_Index(the_class):
     replace_method(the_class, 'add_sa_codes', replacement_add_sa_codes,
                    ignore_missing=True)
     replace_method(the_class, 'permute_entries', replacement_permute_entries,
+                   ignore_missing=True)
+    replace_method(the_class, 'set_vector_level', replacement_set_vector_level,
                    ignore_missing=True)
 
     # get/set state for pickle

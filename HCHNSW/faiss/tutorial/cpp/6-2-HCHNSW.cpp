@@ -17,11 +17,32 @@ void cout_result(
         float* D,
         std::vector<idx_t> original_indices_level2);
 
-int main() {
+int main(int argc, char const* argv[]) {
     int d = 64;    // dimension
     int nb = 1000; // database size
     int nq = 100;  // nb of queries
     int max_level = 4;
+
+    int k = 4;
+    int search_level = 2;
+    // Check if an argument for search_level is provided
+    if (argc == 2) {
+        try {
+            // Convert the input argument to an integer
+            search_level = std::stoi(argv[1]);
+        } catch (const std::invalid_argument& e) {
+            std::cerr
+                    << "Invalid input for search_level. Please provide an integer."
+                    << std::endl;
+            return 1;
+        } catch (const std::out_of_range& e) {
+            std::cerr << "Input for search_level is out of range." << std::endl;
+            return 1;
+        }
+    }
+
+    // Print the search level for confirmation
+    std::cout << "Search level: " << search_level << std::endl;
 
     std::mt19937 rng(12345);
     std::uniform_real_distribution<> distrib;
@@ -65,9 +86,6 @@ int main() {
                   << std::endl;
     }
 
-    int k = 4;
-    int search_level = 2;
-
     // Count how many points are at the desired level (level 2)
     int count_level2 = 0;
     for (int i = 0; i < nb; i++) {
@@ -97,7 +115,11 @@ int main() {
               << count_level2 << std::endl;
 
     faiss::IndexHCHNSWFlat index(d, max_level, 32, 1, nb);
-    index.set_vector_level(level);
+
+    // Ensure type compatibility by converting the int vector to idx_t type (if needed)
+    std::vector<idx_t> level_idx(level.begin(), level.end());
+    
+    index.set_vector_level(level.size(), level_idx.data());
     index.add(nb, xb);
 
     faiss::IndexHNSWFlat index_hnsw(d, 32);
@@ -109,8 +131,8 @@ int main() {
 
         faiss::SearchParametersHCHNSW* params =
                 new faiss::SearchParametersHCHNSW();
-        params->search_level = 2;
-        // TODO: Search algorithm has bugs
+        params->search_level = search_level;
+
         index.search(nq, xq, k, D, I, params);
         cout_result(nq, k, I, D, std::vector<idx_t>());
 

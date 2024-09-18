@@ -28,6 +28,7 @@
 #include <faiss/IndexAdditiveQuantizerFastScan.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexHNSW.h>
+#include <faiss/IndexHCHNSW.h>
 #include <faiss/IndexIVF.h>
 #include <faiss/IndexIVFAdditiveQuantizer.h>
 #include <faiss/IndexIVFAdditiveQuantizerFastScan.h>
@@ -378,6 +379,26 @@ static void read_HNSW(HNSW* hnsw, IOReader* f) {
     // // deprecated field
     // READ1(hnsw->upper_beam);
     READ1_DUMMY(int)
+}
+
+static void read_HCHNSW(HCHNSW* hchnsw, IOReader* f) {
+    READVECTOR(hchnsw->levels);
+    READVECTOR(hchnsw->level_neighbors);
+    READVECTOR(hchnsw->offsets);
+    READVECTOR(hchnsw->neighbors);
+    READVECTOR(hchnsw->leiden_hier_offset);
+    READVECTOR(hchnsw->leiden_hier_neighbor);
+    READVECTOR(hchnsw->cross_neighbors);
+    READVECTOR(hchnsw->first_entry_points_in_level);
+
+    READ1(hchnsw->entry_point);
+    READ1(hchnsw->vector_size);
+    READ1(hchnsw->max_level);
+    READ1(hchnsw->efConstruction);
+    READ1(hchnsw->efSearch);
+
+    READ1_DUMMY(int);
+
 }
 
 static void read_NSG(NSG* nsg, IOReader* f) {
@@ -980,7 +1001,27 @@ Index* read_index(IOReader* f, int io_flags) {
             dynamic_cast<IndexPQ*>(idxhnsw->storage)->pq.compute_sdc_table();
         }
         idx = idxhnsw;
-    } else if (
+    }else if(h == fourcc("IHCf") || h == fourcc("IHCp") || h == fourcc("IHCs")){
+        IndexHCHNSW* idxhchnsw = nullptr;
+        if (h == fourcc("IHCf"))
+            idxhchnsw = new IndexHCHNSWFlat();
+        if (h == fourcc("IHCp"))
+            idxhchnsw = new IndexHCHNSWPQ();
+        if (h == fourcc("IHCs"))
+            idxhchnsw = new IndexHCHNSWSQ();
+
+        read_index_header(idxhchnsw, f);
+
+        read_HCHNSW(&idxhchnsw->hchnsw, f);
+
+        idxhchnsw->storage = read_index(f, io_flags);
+        idxhchnsw->own_fields = idxhchnsw->storage != nullptr;
+        if (h == fourcc("IHNp") && !(io_flags & IO_FLAG_PQ_SKIP_SDC_TABLE)) {
+            dynamic_cast<IndexPQ*>(idxhchnsw->storage)->pq.compute_sdc_table();
+        }
+        idx = idxhchnsw;
+    } 
+    else if (
             h == fourcc("INSf") || h == fourcc("INSp") || h == fourcc("INSs")) {
         IndexNSG* idxnsg;
         if (h == fourcc("INSf"))

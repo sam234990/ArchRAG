@@ -71,7 +71,7 @@ struct IndexHCHNSW : Index {
             const storage_idx_t* edges,
             size_t nedge);
 
-    void set_vector_level(const std::vector<int>& level);
+    void set_vector_level(size_t size, const idx_t* level);
 
     /// Trains the storage if needed
     void train(idx_t n, const float* x) override;
@@ -101,17 +101,6 @@ struct IndexHCHNSW : Index {
     DistanceComputer* get_distance_computer() const override;
 };
 
-/*
-explicit IndexHCHNSW(
-            int d = 0,
-            int ML = 0,
-            int M = 32,
-            int CL = 1,
-            int vector_size = 0,
-            MetricType metric = METRIC_L2);
-    explicit IndexHCHNSW(Index* storage, int ML, int M = 32, int CL = 1);
-    */
-
 /** Flat index topped with with a HNSW structure to access elements
  *  more efficiently.
  */
@@ -119,11 +108,11 @@ explicit IndexHCHNSW(
 struct IndexHCHNSWFlat : IndexHCHNSW {
     IndexHCHNSWFlat();
     IndexHCHNSWFlat(
-            int d = 0,
-            int ML = 0,
-            int M = 32,
-            int CL = 1,
-            int vector_size = 0,
+            int d,
+            int ML,
+            int M,
+            int CL,
+            int vector_size,
             MetricType metric = METRIC_L2);
 };
 

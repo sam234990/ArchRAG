@@ -27,6 +27,7 @@
 #include <faiss/IndexAdditiveQuantizer.h>
 #include <faiss/IndexAdditiveQuantizerFastScan.h>
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHCHNSW.h>
 #include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVF.h>
 #include <faiss/IndexIVFAdditiveQuantizer.h>
@@ -313,6 +314,29 @@ static void write_HNSW(const HNSW* hnsw, IOWriter* f) {
     WRITE1(hnsw->efConstruction);
     WRITE1(hnsw->efSearch);
 
+    // // deprecated field
+    // WRITE1(hnsw->upper_beam);
+    constexpr int tmp_upper_beam = 1;
+    WRITE1(tmp_upper_beam);
+}
+
+static void write_HCHNSW(const HCHNSW* hchnsw, IOWriter* f) {
+    // write_HNSW(hchnsw, f);
+    WRITEVECTOR(hchnsw->levels);
+    WRITEVECTOR(hchnsw->level_neighbors);
+    WRITEVECTOR(hchnsw->offsets);
+    WRITEVECTOR(hchnsw->neighbors);
+    WRITEVECTOR(hchnsw->leiden_hier_offset);
+    WRITEVECTOR(hchnsw->leiden_hier_neighbor);
+    WRITEVECTOR(hchnsw->cross_neighbors);
+    WRITEVECTOR(hchnsw->first_entry_points_in_level);
+
+    WRITE1(hchnsw->entry_point);
+    WRITE1(hchnsw->vector_size);
+    WRITE1(hchnsw->max_level);
+    WRITE1(hchnsw->efConstruction);
+    WRITE1(hchnsw->efSearch);
+    
     // // deprecated field
     // WRITE1(hnsw->upper_beam);
     constexpr int tmp_upper_beam = 1;
@@ -784,6 +808,25 @@ void write_index(const Index* idx, IOWriter* f, int io_flags) {
         } else {
             write_index(idxhnsw->storage, f);
         }
+    } else if (
+            const IndexHCHNSW* idxhchnsw =
+                    dynamic_cast<const IndexHCHNSW*>(idx)) {
+        uint32_t h = dynamic_cast<const IndexHCHNSWFlat*>(idx) ? fourcc("IHCf")
+                : dynamic_cast<const IndexHCHNSWPQ*>(idx)      ? fourcc("IHCp")
+                : dynamic_cast<const IndexHCHNSWSQ*>(idx)      ? fourcc("IHCs")
+                                                               : 0;
+        FAISS_THROW_IF_NOT(h != 0);
+        WRITE1(h);
+        write_index_header(idxhchnsw, f);
+
+        write_HCHNSW(&idxhchnsw->hchnsw, f);
+        if (io_flags & IO_FLAG_SKIP_STORAGE) {
+            uint32_t n4 = fourcc("null");
+            WRITE1(n4);
+        } else {
+            write_index(idxhchnsw->storage, f);
+        }
+
     } else if (const IndexNSG* idxnsg = dynamic_cast<const IndexNSG*>(idx)) {
         uint32_t h = dynamic_cast<const IndexNSGFlat*>(idx) ? fourcc("INSf")
                 : dynamic_cast<const IndexNSGPQ*>(idx)      ? fourcc("INSp")
