@@ -1,8 +1,10 @@
 import json
+import multiprocessing as mp
+from functools import partial
+
 from llm import llm_invoker
 from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
 from utils import *
-from attr_cluster import *
 from lm_emb import *
 
 
@@ -60,7 +62,7 @@ def prep_community_report_context(
     return new_string
 
 
-def extract_community_report(result):
+def extract_community_report(result, community_id):
     """
     Extract the fields from result if valid.
     """
@@ -82,7 +84,7 @@ def extract_community_report(result):
         }, True
     else:
         return {
-            "title": None,
+            "title": "CommunityID" + str(community_id),
             "summary": None,
             "findings": None,
             "rating": None,
@@ -100,10 +102,10 @@ def dict_has_keys_with_types(d, keys_with_types):
 
 def generate_community_report(community_text, args, community_id, max_generate=3):
     report_prompt = COMMUNITY_REPORT_PROMPT.format(input_text=community_text)
-    current_generated = 0
     retries = 0
     success = False
     raw_result = None
+    extract_result = None
 
     while not success and retries < max_generate:
         raw_result = llm_invoker(
@@ -112,7 +114,7 @@ def generate_community_report(community_text, args, community_id, max_generate=3
         try:
             output = json.loads(raw_result)
 
-            extract_result, success = extract_community_report(output)
+            extract_result, success = extract_community_report(output, community_id)
             if success:
                 break
         except json.JSONDecodeError as e:
@@ -124,60 +126,121 @@ def generate_community_report(community_text, args, community_id, max_generate=3
 
     if success is False:
         print(f"Failed to generate community report for community:{community_id}")
+        if extract_result is None:
+            extract_result = {
+                "title": "CommunityID" + str(community_id),
+                "summary": None,
+                "findings": None,
+                "rating": None,
+                "rating_explanation": None,
+            }
         return None, extract_result
 
     return raw_result, extract_result
 
 
-def community_report_embedding(community_report, args):
-    text = community_report["title"] + community_report["summary"]
+def report_embedding(community_report, community_text, args):
+    if community_report["title"] is None or community_report["summary"] is None:
+        text = community_text
+        community_report["title"] = "CommunityID" + str(
+            community_report["community_id"]
+        )
+    else:
+        text = community_report["title"] + community_report["summary"]
     embedding = openai_embedding(
         text, args.embedding_api_key, args.embedding_api_base, args.embedding_model
     )
-    return embedding
+    community_report["embedding"] = embedding
+    return community_report
 
 
-def community_report(results_by_level, args, final_entities, final_relationships):
+def community_report_worker(
+    community_id, node_list, final_entities, final_relationships, args, level_dict
+):
+    # 处理单个社区的函数
+    print(f"Community {community_id}:")
+    community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
+    community_relationships = final_relationships[
+        final_relationships["source"].isin(node_list)
+    ]
+    community_text = prep_community_report_context(
+        0, community_nodes, community_relationships, max_tokens=args.max_tokens
+    )
+
+    raw_result, community_report = generate_community_report(
+        community_text, args, community_id
+    )
+
+    community_report["community_id"] = community_id
+    community_report["level"] = level_dict.get(
+        community_id, None
+    )  # 使用 level_dict 获取对应的 level
+    community_report["community_nodes"] = node_list
+    community_report["raw_result"] = raw_result
+
+    if raw_result is None or community_report is None:
+        # use the community text as the embedding alternatively
+        community_report["embedding"] = openai_embedding(
+            community_text,
+            args.embedding_api_key,
+            args.embedding_api_base,
+            args.embedding_model,
+        )
+    else:
+        community_report = report_embedding(community_report, community_text, args)
+
+    return community_report
+
+
+def community_report_batch(
+    communities: dict[str, list[str]],
+    final_entities,
+    final_relationships,
+    args,
+    level_dict: dict[str, int],
+    num_workers=8,
+):
+    results_community = []
+
+    # 将处理任务分发到各个进程
+    pool = mp.Pool(processes=num_workers)
+
+    # 使用partial来将固定的参数传递到worker中
+    process_func = partial(
+        community_report_worker,
+        final_entities=final_entities,
+        final_relationships=final_relationships,
+        args=args,
+        level_dict=level_dict,
+    )
+
+    # 并行处理每个社区
+    results_community = pool.starmap(process_func, communities.items())
+
+    pool.close()  # 关闭进程池
+    pool.join()  # 等待所有进程完成
+
+    return results_community
+
+
+def community_report_for_level(
+    results_by_level, args, final_entities, final_relationships
+):
     results_community = []
     for level, communities in results_by_level.items():
         print(f"Create community report for level: {level} ")
         print(f"Number of communities in this level: {len(communities)}")
-        for community_id, node_list in communities.items():
-            # if community_id != "9":
-            #     continue
-            print(f"Community {community_id}:")
-            # print(f"Nodes:{node_list}")
-            community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
-            community_relationships = final_relationships[
-                final_relationships["source"].isin(node_list)
-            ]
-            community_text = prep_community_report_context(
-                0, community_nodes, community_relationships, max_tokens=args.max_tokens
-            )
+        # 构建一个 level_dict，key 为 community_id，value 为 level
+        level_dict = {community_id: level for community_id in communities.keys()}
 
-            raw_result, community_report = generate_community_report(
-                community_text, args, community_id
-            )
-            # print(community_report)
-
-            community_report["community_id"] = community_id
-            community_report["level"] = level
-            community_report["community_nodes"] = node_list
-            community_report["raw_result"] = raw_result
-
-            if raw_result is None or community_report is None:
-                # use the community text as the embedding alternatively
-                community_report["embedding"] = openai_embedding(
-                    community_text,
-                    args.embedding_api_key,
-                    args.embedding_api_base,
-                    args.embedding_model,
-                )
-            else:
-                community_report["embedding"] = community_report_embedding(
-                    community_report, args
-                )
-            results_community.append(community_report)
+        res = community_report_batch(
+            communities=communities,
+            final_entities=final_entities,
+            final_relationships=final_relationships,
+            args=args,
+            level_dict=level_dict,
+        )
+        results_community.extend(res)
 
     community_df = pd.DataFrame(results_community)
     return community_df
@@ -258,12 +321,12 @@ if __name__ == "__main__":
 
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     cos_graph = compute_distance(graph=graph)
-    results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
+    # results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
 
-    confirm_community_result(results_by_level)
+    # confirm_community_result(results_by_level)
 
-    # community_df = community_report(
-    # results_by_level, args, final_entities, final_relationships
+    # community_df = community_report_for_level(
+    #     results_by_level, args, final_entities, final_relationships
     # )
 
     # output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"

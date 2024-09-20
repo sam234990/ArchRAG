@@ -2,6 +2,7 @@ import tiktoken
 import argparse
 import networkx as nx
 import pandas as pd
+import numpy as np
 from scipy.spatial.distance import cosine
 from pathlib import Path
 
@@ -45,11 +46,8 @@ def read_graph_nx(file_path: str):
     return graph, final_entities, final_relationships
 
 
-def embedding_distance(emb_1, emb_2):
-    """Compute embedding distance between two nodes."""
-    cos_similarity = 1 - cosine(emb_1, emb_2)  # 得到余弦相似度
-    cos_distance = 1 - cos_similarity  # 转换为余弦距离
-    return cos_distance
+def embedding_similarity(emb_1, emb_2):
+    return 1 - cosine(emb_1, emb_2)
 
 
 def compute_distance(graph):
@@ -63,7 +61,7 @@ def compute_distance(graph):
         for neighbor in graph.neighbors(n1):
             if not res_graph.has_edge(n1, neighbor):
                 nei_emb = graph.nodes[neighbor]["embedding"]
-                cos_res = embedding_distance(n1_emb, nei_emb)
+                cos_res = embedding_similarity(n1_emb, nei_emb)
                 # 将边和余弦相似度结果添加到新图中
                 res_graph.add_edge(n1, neighbor, weight=cos_res)
 
@@ -73,6 +71,45 @@ def compute_distance(graph):
 def create_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for the project."
+    )
+
+    parser.add_argument(
+        "--base_path",
+        type=str,
+        # required=True,
+        default="/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts",
+        help="Base path to the directory containing the graph data.",
+    )
+
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        # required=True,
+        default="/home/wangshu/rag/hier_graph_rag/datasets_io",
+        help="Output dir path for index",
+    )
+
+    # attr clustering parameters
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0xDEADBEEF,
+        help="Seed for reproducibility in leiden clustering \
+            (default is hex 0xDEADBEEF, input can be any valid integer)",
+    )
+
+    parser.add_argument(
+        "--max_level",
+        type=int,
+        default=4,
+        help="Set the maximum level for attribute clustering",
+    )
+
+    parser.add_argument(
+        "--min_clusters",
+        type=int,
+        default=5,
+        help="Set the number of minimum cluster in the top level for attribute clustering",
     )
 
     # 添加参数
@@ -90,6 +127,7 @@ def create_arg_parser():
         help="Base URL for the API service",
         default="http://localhost:11434/v1",
     )
+
     parser.add_argument(
         "--engine",
         type=str,
@@ -106,14 +144,6 @@ def create_arg_parser():
         type=int,
         default=4000,
         help="Maximum community report tokens ",
-    )
-
-    parser.add_argument(
-        "--base_path",
-        type=str,
-        # required=True,
-        default="/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts",
-        help="Base path to the directory containing the graph data.",
     )
 
     parser.add_argument(

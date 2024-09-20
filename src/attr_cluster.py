@@ -1,7 +1,12 @@
+import os
+import ast
+import math
+import numpy as np
 import networkx as nx
-from utils import *
 import pandas as pd
 from graspologic.partition import hierarchical_leiden, leiden
+from utils import *
+from community_report import community_report_batch
 
 
 def attribute_hierarchical_clustering(
@@ -96,28 +101,270 @@ def compute_leiden_communities(
     return community_info, community_mapping
 
 
-def compute_leiden(graph: nx.Graph, seed: int):
+# attr cluster method 2:
+# each time, we first compute the leiden community for the given cos graph
+# then, we get the community report and the corresponding embedding
+# finally, we reconstruct the graph with the community information
+# and use this graph for the next level community computation
+def compute_leiden(graph: nx.Graph, seed=0xDEADBEE):
     # 使用 leiden 算法计算一层
     community_mapping = leiden(
         graph,
-        partition_kwargs={"weight": "weight"},
+        is_weighted=True,
         random_seed=seed,
     )
+    c_n_mapping: dict[str, list[str]] = {}
 
-    # 将结果转换为字典格式，方便处理
-    node_to_community = {node: community for node, community in community_mapping}
+    for node, community in community_mapping.items():
+        community_id = str(community)
+        if community_id not in c_n_mapping:
+            c_n_mapping[community_id] = []
+        c_n_mapping[community_id].append(node)
 
-    return node_to_community
+    return c_n_mapping
+
+
+def community_id_node_resize(
+    c_n_mapping: dict[str, list[str]], community_df: pd.DataFrame
+):
+    if not community_df.empty:
+        # 先将 community_id 字段转换为数值类型，遇到非数值的情况使用 NaN，然后忽略 NaN 值
+        community_df["community_id_numeric"] = pd.to_numeric(
+            community_df["community_id"], errors="coerce"
+        )
+
+        # 找到 community_id 中的最大值
+        cur_max_id = community_df["community_id_numeric"].max() + 1
+    else:
+        cur_max_id = 0
+
+    community_df["community_nodes"] = community_df["community_nodes"].apply(
+        lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+    )
+    
+    # 创建一个新的字典，存放更新后的 community_id 和对应的社区节点
+    updated_c_n_mapping = {}
+    c_c_mapping = {}
+
+    # 遍历 c_n_mapping 中的每个社区
+    for community_id, node_list in c_n_mapping.items():
+        # 获取 node_list 中每个 node 对应的 title 列表
+        community_nodes = []
+        for community_title in node_list:
+            ct_nodes = community_df.loc[
+                community_df["title"] == community_title, "community_nodes"
+            ]
+            if not ct_nodes.empty:
+                # ct_nodes 是一个 Series，取第一个值
+                nodes_list = ct_nodes.iloc[0]
+                
+                if isinstance(nodes_list, list):
+                    community_nodes.extend(nodes_list)
+                else:
+                    print(f"Warning: {community_title} does not have a list of community_nodes")
+            else:
+                print(f"Warning: {community_title} not found in community_df")
+
+        # 去重处理
+        unique_nodes = list(set(community_nodes))
+
+        updated_c_n_mapping[str(cur_max_id)] = unique_nodes
+        c_c_mapping[str(cur_max_id)] = node_list
+
+        # 增加 cur_max_id，为下一个社区准备新的编号
+        cur_max_id += 1
+
+    return updated_c_n_mapping
+
+
+def reconstruct_graph(community_df, final_relationships):
+    graph = nx.Graph()
+
+    node_community_map = {}
+
+    # add nodes
+    for idx, row in community_df.iterrows():
+        # Only add the 'embedding' attribute to the graph
+        embedding = row["embedding"] if "embedding" in row else None
+        if isinstance(embedding, str):
+            try:
+                embedding = ast.literal_eval(embedding)
+            except (ValueError, SyntaxError):
+                print(f"Warning: Unable to parse embedding for {row['title']}")
+
+        if not pd.notna(row["title"]):
+            new_title = "CommunityID" + str(row["community_id"])
+            community_df.loc[idx, "title"] = new_title  # 修改原始 DataFrame 中的 title
+            row["title"] = new_title  # 更新当前迭代的 row 中的 title
+        graph.add_node(row["title"], embedding=embedding)
+
+        community_nodes = row["community_nodes"]
+        if isinstance(community_nodes, str):
+            try:
+                community_nodes = ast.literal_eval(community_nodes)
+            except (ValueError, SyntaxError):
+                print(f"Warning: Unable to parse community_nodes for {row['title']}")
+                community_nodes = []
+
+        for nodes in community_nodes:
+            node_community_map[nodes] = row["title"]
+
+    for _, row in final_relationships.iterrows():
+
+        if row["source"] in node_community_map:
+            source = node_community_map[row["source"]]
+        else:
+            continue
+
+        if row["target"] in node_community_map:
+            target = node_community_map[row["target"]]
+        else:
+            continue
+
+        if source == target:
+            continue
+
+            # If the edge already exists, increment the weight; otherwise, add the edge with weight 1
+        if graph.has_edge(source, target):
+            graph[source][target]["weight"] += 1
+        else:
+            graph.add_edge(source, target, weight=1)
+
+            # 检查边中是否有 NaN
+    nan_edges = [
+        (u, v)
+        for u, v in graph.edges
+        if u is None
+        or v is None
+        or (isinstance(u, float) and math.isnan(u))
+        or (isinstance(v, float) and math.isnan(v))
+    ]
+
+    if nan_edges:
+        print(f"Detected NaN edges: {nan_edges}")
+    else:
+        print("No NaN edges detected.")
+        # 检查节点中是否有 NaN
+    nan_nodes = [
+        node
+        for node in graph.nodes
+        if node is None or (isinstance(node, float) and math.isnan(node))
+    ]
+
+    if nan_nodes:
+        print(f"Detected NaN nodes: {nan_nodes}")
+    else:
+        print("No NaN nodes detected.")
+
+    self_loops = list(nx.selfloop_edges(graph))
+    if self_loops:
+        graph.remove_edges_from(self_loops)
+
+    return graph, community_df
+
+
+def attr_cluster(
+    init_graph: nx.Graph,
+    final_entities,
+    final_relationships,
+    args,
+    max_level=4,
+    min_clusters=5,
+):
+    level = 1
+    graph = init_graph
+    community_df = pd.DataFrame()
+    while level <= max_level:
+        print(f"Start clustering for level {level}")
+
+        # 计算余弦距离图
+        cos_graph = compute_distance(graph)
+
+        # 使用 Leiden 算法进行聚类
+        c_n_mapping = compute_leiden(cos_graph, args.seed)
+
+        # 如果不是第一层，需要调整 community_id
+        if level > 1:
+            updated_c_n_mapping = community_id_node_resize(
+                c_n_mapping=c_n_mapping, community_df=community_df
+            )
+        else:
+            updated_c_n_mapping = c_n_mapping
+
+        print(f"Number of communities: {len(updated_c_n_mapping)}")
+        c_id_list = list(updated_c_n_mapping.keys())
+        print(f"Community id list: {c_id_list}")
+
+        # 构建 level_dict，记录每个社区对应的 level
+        level_dict = {
+            community_id: level for community_id in updated_c_n_mapping.keys()
+        }
+
+        tmp_comunity_df_result = os.path.join(
+            args.output_dir, f"tmp_community_df_{level}.csv"
+        )
+
+        if os.path.exists(tmp_comunity_df_result):
+            print(
+                f"File {tmp_comunity_df_result} already exists. Loading existing data."
+            )
+            new_community_df = pd.read_csv(tmp_comunity_df_result)
+            new_community_df["embedding"] = new_community_df["embedding"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+            )
+            new_community_df["community_nodes"] = new_community_df[
+                "community_nodes"
+            ].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        else:
+            print("Generating new community report.")
+            new_community_df = community_report_batch(
+                communities=updated_c_n_mapping,
+                final_entities=final_entities,
+                final_relationships=final_relationships,
+                level_dict=level_dict,
+                args=args,
+            )
+            new_community_df = pd.DataFrame(new_community_df)
+
+        # update
+        graph, new_community_df = reconstruct_graph(
+            new_community_df, final_relationships
+        )
+        new_community_df.to_csv(tmp_comunity_df_result, index=False)
+        community_df = pd.concat([community_df, new_community_df], ignore_index=True)
+        level += 1
+
+        # check for finish
+        number_of_clusters = len(c_n_mapping)
+        if number_of_clusters < min_clusters:
+            break
+
+    return community_df
 
 
 if __name__ == "__main__":
-    base_path = "/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts"
+    parser = create_arg_parser()
+    args = parser.parse_args()
 
-    graph, final_entities, final_relationships = read_graph_nx(base_path)
+    graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     cos_graph = compute_distance(graph=graph)
-    results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
-    for level, communities in results_by_level.items():
-        print(f"Create community report for level: {level} ")
-        print(f"Number of communities in this level: {len(communities)}")
-        for community_id, node_list in communities.items():
-            print(f"Community {community_id}:")
+    print("finish compute cos graph")
+    community_df = attr_cluster(
+        init_graph=graph,
+        final_entities=final_entities,
+        final_relationships=final_relationships,
+        args=args,
+        max_level=args.max_level,
+        min_clusters=args.min_clusters,
+    )
+
+    output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"
+    community_df.to_csv(output_path, index=False)
+
+    # results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
+
+    # for level, communities in results_by_level.items():
+    #     print(f"Create community report for level: {level} ")
+    #     print(f"Number of communities in this level: {len(communities)}")
+    #     for community_id, node_list in communities.items():
+    #         print(f"Community {community_id}:")
