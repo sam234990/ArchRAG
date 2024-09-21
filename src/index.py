@@ -4,6 +4,7 @@ import pandas as pd
 from utils import create_arg_parser, read_graph_nx
 from attr_cluster import attr_cluster
 from hchnsw_index import entity_embedding, create_hchnsw_index
+from client_reasoning import level_summary
 
 
 def make_hc_index(args):
@@ -18,21 +19,34 @@ def make_hc_index(args):
     )
     print("finish compute hierarchical clusters")
 
-    c_df_save_path = os.path.join(args.output_dir, "community_df_intermediate.csv")
-    community_df.to_csv(c_df_save_path, index=False)
+    # c_df_save_path = os.path.join(args.output_dir, "community_df_intermediate.csv")
+    # community_df.to_csv(c_df_save_path, index=False)
 
-    entities_df: pd.DataFrame = entity_embedding(entities_df, args=args)
-    final_entity_df, final_community_df = create_hchnsw_index(
-        community_df=community_df, entity_df=entities_df, save_path=args.output_dir
-    )
-    print("finish compute HC HNSW")
+    # entities_df: pd.DataFrame = entity_embedding(entities_df, args=args)
+    # final_community_df, final_entity_df = create_hchnsw_index(
+    #     community_df=community_df, entity_df=entities_df, save_path=args.output_dir
+    # )
+    # print("finish compute HC HNSW")
 
-    f_c_save_path = os.path.join(args.output_dir, "community_df_index.csv")
-    final_community_df.to_csv(f_c_save_path, index=False)
+    make_level_summary(community_df, args.output_dir, args)
 
-    f_e_save_path = os.path.join(args.output_dir, "entity_df_index.csv")
-    final_entity_df.to_csv(f_e_save_path, index=False)
+    print("finish make level summary")
+
+    # f_c_save_path = os.path.join(args.output_dir, "community_df_index.csv")
+    # final_community_df.to_csv(f_c_save_path, index=False)
+
+    # f_e_save_path = os.path.join(args.output_dir, "entity_df_index.csv")
+    # final_entity_df.to_csv(f_e_save_path, index=False)
     print("finish compute HCa RAG index")
+
+
+def make_level_summary(community_df, save_path, args):
+    max_level = community_df["level"].max()
+    print(f"The maximum level is: {max_level}")
+    level_summary_df = level_summary(community_df, max_level, args)
+
+    level_summary_path = os.path.join(save_path, "level_summary.csv")
+    level_summary_df.to_csv(level_summary_path, index=False)
 
 
 if __name__ == "__main__":

@@ -163,9 +163,84 @@ id,source,target,description
 """
 
 
+# Level summary prompt
+
+LEVEL_SUMMARY_PROMPT = """
+You are an AI assistant that helps a human analyst to perform information summarization. Information summarization is the process of extracting and analyzing relevant details about multiple communities within a hierarchical structure. This task involves distilling key information and assessing the communities' role and significance within the overall hierarchical structure.
+
+# Goal
+
+Given multiple community contexts of a specified level in a hierarchy structure, write a level report that objectively and comprehensively reflects the structure and relationships of these communities at this level. The report will be used to inform decision-makers with insights into the importance and influence of the communities at this level within the hierarchy. The context of this report inlcudes an overview of the communities in this level,  their significance, and noteworthy claims.
+
+# Report Structure
+
+The report should include the following sections:
+
+- SUMMARY: A concise summary of the community at this specific level of the community hierarchy.
+- RATE: A float score between 0-10 that represents the importance of this level in the community structure.
+- RATING EXPLANATION: A short sentence explaining the given importance score.
+
+# Output Format
+
+Return the output as a well-formed JSON-formatted string with the following format:
+    {{
+        "summary": <level_summary>,
+        "rate": <importance_score>,
+        "rating_explanation": <rating_explanation>
+    }}
+
+
+# Example Input
+-----------
+
+Max level: 3
+Community level: 1
+
+Sample Communities:
+
+community_id, title, summary 
+42, Memory Management Community, The Memory Management Community revolves around entities related to memory allocation, deallocation, and potential errors such as segmentation faults and memory leaks.
+55, Counter Community, The Counter Community revolves around entities related to compiling and running programs, with a focus on the MAKE COUNTER command and its interactions.
+64, Real-Time Scheduling Community, The Real-Time Scheduling community revolves around the process of scheduling tasks to meet deadlines, involving managing and allocating resources in real-time. Key entities include REAL-TIME SCHEDULING, PROCESSOR, PROGRAMS, REAL-TIME OPERATING SYSTEMS, CHAPTER 9 THREADS, SCHEDULER, THREADS, ALGORITHMS, DEADLINES, GENERAL-PURPOSE OPERATING SYSTEMS, and TASKS.
+72, Process Community, The Process Community consists of various processes that interact with each other in specific ways, sharing memory resources and influencing each other's execution.
+    
+    
+    
+Output:
+{{
+    "summary": "At this level, the communities provide key technical insights into operating systems, offering an overview of the relationships between them while preserving important details from lower layers. The communities introduce critical functions such as memory management, real-time task scheduling, and process interactions. For instance, the Memory Management Community focuses on memory allocation, deallocation, and error handling. Overall, this level integrates these essential operations, presenting a comprehensive view of the mechanisms that underpin system performance.",
+    "rate": 7.8,
+    "rating_explanation": "The importance of this level is moderately high due to the essential role these systems play in ensuring the stability and efficiency of larger computing operations."
+}}
+
+# Real Data
+
+Use the following data for your answer. Do not create or assume any additional information.
+
+Text:
+{Community_text}
+
+The report should include the following sections:
+
+- SUMMARY: A concise summary of the community at this specific level of the community hierarchy.
+- RATE: A float score between 0-10 that represents the importance of this level in the community structure.
+- RATING EXPLANATION: A short sentence explaining the given importance score.
+
+# Output Format
+
+Return the output as a well-formed JSON-formatted string with the following format:
+    {{
+        "summary": <level_summary>,
+        "rate": <importance_score>,
+        "rating_explanation": <rating_explanation>
+    }}
+
+Output:"""
+
+
 # Global search prompt
 
-GLOBAL_SEARCH_PROMPT = """
+GLOBAL_MAP_SYSTEM_PROMPT = """
 ---Role---
 
 You are a helpful assistant responding to questions about data in the tables provided.
@@ -241,6 +316,91 @@ The response should be JSON formatted as follows:
         {{"description": "Description of point 2 [Data: Reports (report ids)]", "score": score_value}}
     ]
 }}
+"""
+
+
+GLOBAL_REDUCE_SYSTEM_PROMPT = """
+---Role---
+
+You are a helpful assistant responding to questions about a dataset by synthesizing perspectives from multiple analysts.
+
+
+---Goal---
+
+Generate a response of the target length and format that responds to the user's question, summarize all the reports from multiple analysts who focused on different parts of the dataset.
+
+Note that the analysts' reports provided below are ranked in the **descending order of importance**.
+
+If you don't know the answer or if the provided reports do not contain sufficient information to provide an answer, just say so. Do not make anything up.
+
+The final response should remove all irrelevant information from the analysts' reports and merge the cleaned information into a comprehensive answer that provides explanations of all the key points and implications appropriate for the response length and format.
+
+Add sections and commentary to the response as appropriate for the length and format. Style the response in markdown.
+
+The response shall preserve the original meaning and use of modal verbs such as "shall", "may" or "will".
+
+The response should also preserve all the data references previously included in the analysts' reports, but do not mention the roles of multiple analysts in the analysis process.
+
+**Do not list more than 5 record ids in a single reference**. Instead, list the top 5 most relevant record ids and add "+more" to indicate that there are more.
+
+For example:
+
+"Person X is the owner of Company Y and subject to many allegations of wrongdoing [Data: Reports (2, 7, 34, 46, 64, +more)]. He is also CEO of company X [Data: Reports (1, 3)]"
+
+where 1, 2, 3, 7, 34, 46, and 64 represent the id (not the index) of the relevant data record.
+
+Do not include information where the supporting evidence for it is not provided.
+
+
+---Target response length and format---
+
+{response_type}
+
+
+---Analyst Reports---
+
+{report_data}
+
+
+---Goal---
+
+Generate a response of the target length and format that responds to the user's question, summarize all the reports from multiple analysts who focused on different parts of the dataset.
+
+Note that the analysts' reports provided below are ranked in the **descending order of importance**.
+
+If you don't know the answer or if the provided reports do not contain sufficient information to provide an answer, just say so. Do not make anything up.
+
+The final response should remove all irrelevant information from the analysts' reports and merge the cleaned information into a comprehensive answer that provides explanations of all the key points and implications appropriate for the response length and format.
+
+The response shall preserve the original meaning and use of modal verbs such as "shall", "may" or "will".
+
+The response should also preserve all the data references previously included in the analysts' reports, but do not mention the roles of multiple analysts in the analysis process.
+
+**Do not list more than 5 record ids in a single reference**. Instead, list the top 5 most relevant record ids and add "+more" to indicate that there are more.
+
+For example:
+
+"Person X is the owner of Company Y and subject to many allegations of wrongdoing [Data: Reports (2, 7, 34, 46, 64, +more)]. He is also CEO of company X [Data: Reports (1, 3)]"
+
+where 1, 2, 3, 7, 34, 46, and 64 represent the id (not the index) of the relevant data record.
+
+Do not include information where the supporting evidence for it is not provided.
+
+
+---Target response length and format---
+
+{response_type}
+
+Add sections and commentary to the response as appropriate for the length and format. Style the response in markdown.
+"""
+
+NO_DATA_ANSWER = (
+    "I am sorry but I am unable to answer this question given the provided data."
+)
+
+GENERAL_KNOWLEDGE_INSTRUCTION = """
+The response may also include relevant real-world knowledge outside the dataset, but it must be explicitly annotated with a verification tag [LLM: verify]. For example:
+"This is an example sentence supported by real-world knowledge [LLM: verify]."
 """
 
 

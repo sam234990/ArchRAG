@@ -119,10 +119,10 @@ def generate_community_report(community_text, args, community_id, max_generate=3
                 break
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
-            retries += 1
         except Exception as e:
             print(f"An error occurred: {e}")
-            retries += 1
+
+        retries += 1
 
     if success is False:
         print(f"Failed to generate community report for community:{community_id}")
