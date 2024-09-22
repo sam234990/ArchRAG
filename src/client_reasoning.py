@@ -116,11 +116,6 @@ community_id, title, summary \n"""
     return res_level_context
 
 
-def extract_level(summary_output):
-
-    pass
-
-
 def generate_level_summary(content, max_retries, args):
     retries = 0
     success = False
@@ -154,8 +149,8 @@ def level_summary(community_df, max_level, args):
             level, max_level, community_df, sample_size=3, max_tokens=args.max_tokens
         )
         report = generate_level_summary(level_content, args.max_retries, args)
-        report['level'] = level
-        
+        report["level"] = level
+
         level_summary.append(report)
 
     level_summary = pd.DataFrame(level_summary)
