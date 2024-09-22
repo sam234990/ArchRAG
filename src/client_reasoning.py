@@ -157,6 +157,42 @@ def level_summary(community_df, max_level, args):
     return level_summary
 
 
+def prep_infer_content(
+    entity_context: list[str], community_context: list[str], query, max_tokens=None
+) -> str:
+    res_content = ""
+    entity_str = """
+ENTITY:
+entity_id, name, description \n
+"""
+    community_str = """
+COMMUNITY:
+community_id, title, summary \n
+"""
+
+    if entity_context:
+        for entity in entity_context:
+            entity_str += entity + "\n"
+            if max_tokens and num_tokens(entity_str) > max_tokens:
+                break
+            else:
+                res_content = entity_str
+        res_content += "\n"
+
+    if community_context:
+        community_str = res_content + community_str
+        for community in community_context:
+            community_str += community + "\n"
+            if max_tokens and num_tokens(community_str) > max_tokens:
+                break
+            else:
+                res_content = community_str
+        res_content += "\n"
+
+    res_content = GENERATION_PROMPT.format(context_data=res_content, user_query=query)
+    return res_content.strip()
+
+
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
