@@ -1,6 +1,7 @@
 import json
 import re
 import pandas as pd
+import numpy as np
 from typing import Tuple, Dict, Any
 from llm import llm_invoker
 from utils import create_arg_parser, num_tokens
@@ -8,72 +9,135 @@ from prompts import *
 
 
 def problem_reasoning(
-    query_content: str, index_info: str, num_level, max_retries: int, args
+    query_content: str,
+    entity_df: pd.DataFrame,
+    community_df: pd.DataFrame,
+    level_summary_df: pd.DataFrame,
+    max_level,
+    max_retries: int,
+    args,
 ) -> list[int]:
+    infer_content = prep_level_infer_content(
+        query_content,
+        entity_df,
+        community_df,
+        level_summary_df,
+        max_level,
+        max_tokens=args.max_tokens,
+    )
+
     reason_level = []
     retry = 0
     success = False
 
     while not success and retry < max_retries:
-        reason_level = llm_invoker(query_content, args, json=True)
+        reason_level = llm_invoker(infer_content, args, json=True)
         try:
             output: dict = json.loads(reason_level)
-            extract_level, success = extract_level(output, num_level)
-            reason_level = extract_level["level"]
-
+            raw_result, rate_list, success = extract_level(output, max_level)
+            reason_level = rate_list
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
-            retries += 1
         except Exception as e:
             print(f"An error occurred: {e}")
-            retries += 1
+        if success:
+            break
 
-    return reason_level
+        retry += 1
+
+    # entity importance is the mean value
+    if reason_level:
+        # 计算平均值
+        average_value = sum(reason_level) / len(reason_level)
+
+        # 将平均值添加到 reason_level 的最前面
+        reason_level.insert(0, average_value)
+    else:
+        reason_level = [5] * (max_level + 1)
+
+    return reason_level, raw_result
+
+
+def prep_level_infer_content(
+    query_content, entity_df, community_df, level_summary_df, max_level, max_tokens=None
+) -> str:
+    index_conent = f"""
+Max level: {max_level}
+Indexed Data:
+
+level_id, community_number, level_summary, community_example  
+"""
+
+    for level in range(1, max_level + 1):
+
+        level_summary_content = level_summary_df[level_summary_df["level"] == level][
+            "summary"
+        ].values[0]
+        community_number = level_summary_df[level_summary_df["level"] == level][
+            "comunity_number"
+        ].values[0]
+
+        level_community_df = community_df[community_df["level"] == level]
+
+        sampled_df = level_community_df.sample(n=1, random_state=42)
+        # 构建字典并转换为字符串格式
+        level_example_dict = {
+            "title": sampled_df["title"].values[0],
+            "summary": sampled_df["summary"].values[0],
+        }
+
+        # 将字典转换为字符串形式
+        level_example_content = str(level_example_dict)
+        level_content = f"{level}, {community_number}, {level_summary_content}, {level_example_content}\n"
+        index_conent += level_content
+
+    index_conent += f"Query: {query_content}\n"
+
+    return LEVEL_INFERENCE_PROMPT.format(indexed_structure_data=index_conent)
 
 
 def extract_level(level_output, num_level) -> Tuple[Dict[str, Any], bool]:
-    res_level = []
-    res_description = ""
+    infer_level_report = []
     success = True
+    rate_list = []
 
-    if "level" in level_output:
-        level_data = level_output["level"]
+    if "finds" in level_output:
+        finds_data = level_output["finds"]
 
-        # 检查 'level' 是否为 list 类型且长度为 num_level
-        if (
-            isinstance(level_data, list)
-            and len(level_data) == num_level
-            and all(isinstance(i, (int, float)) for i in level_data)
-        ):
-            res_level = level_data
+        # 确认 "finds" 是一个列表并且长度为 num_level
+        if isinstance(finds_data, list) and len(finds_data) == num_level:
+            for find in finds_data:
+                level_id = find.get("id", None)
+                rate = find.get("rate", 5.0)
+                rating_explanation = find.get("rating_explanation", "")
+
+                infer_level_report.append(
+                    {
+                        "id": level_id,
+                        "rate": rate,
+                        "rating_explanation": rating_explanation,
+                    }
+                )
+                rate_list.append(float(rate))  # 添加 rate 到 rate_list
+
+            # 如果 finds 中字典数量不足 num_level，用占位数据补齐
+            while len(infer_level_report) < num_level:
+                infer_level_report.append(
+                    {"id": "N/A", "rate": 5.0, "rating_explanation": None}
+                )
+                rate_list.append(5.0)  # 补齐 rate_list
+
+            # 如果 finds 中字典数量超过 num_level，截断多余部分
+            if len(infer_level_report) > num_level:
+                infer_level_report = infer_level_report[:num_level]
+                rate_list = rate_list[:num_level]  # 截断 rate_list
+
         else:
-            # 尝试从非list的level_data中提取数字并转换成list
-            if isinstance(level_data, str):
-                # 提取数字
-                level_values = re.findall(r"[-+]?\d*\.\d+|\d+", level_data)
-                res_level = [float(x) if "." in x else int(x) for x in level_values]
-
-            elif isinstance(level_data, (int, float)):
-                res_level = [level_data]  # 单个数字转为列表
-
-            # 检查转换后的list是否符合num_level的要求
-            if len(res_level) != num_level:
-                res_level = []
-                success = False
-
+            success = False
     else:
         success = False
 
-    # 检测 'description' 字段是否存在且为str类型
-    if "description" in level_output and isinstance(level_output["description"], str):
-        res_description = level_output["description"]
-    else:
-        success = False
-
-    return {
-        "level": res_level,
-        "description": res_description if success else None,
-    }, success
+    return infer_level_report, rate_list, success
 
 
 def prep_level_content(
@@ -150,6 +214,8 @@ def level_summary(community_df, max_level, args):
         )
         report = generate_level_summary(level_content, args.max_retries, args)
         report["level"] = level
+        level_comunity_number = community_df[community_df["level"] == level].shape[0]
+        report["comunity_number"] = level_comunity_number
 
         level_summary.append(report)
 

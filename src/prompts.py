@@ -166,6 +166,8 @@ id,source,target,description
 # Level summary prompt
 
 LEVEL_SUMMARY_PROMPT = """
+# Role
+
 You are an AI assistant that helps a human analyst to perform information summarization. Information summarization is the process of extracting and analyzing relevant details about multiple communities within a hierarchical structure. This task involves distilling key information and assessing the communities' role and significance within the overall hierarchical structure.
 
 # Goal
@@ -208,7 +210,7 @@ community_id, title, summary
     
 Output:
 {{
-    "summary": "At this level, the communities provide key technical insights into operating systems, offering an overview of the relationships between them while preserving important details from lower layers. The communities introduce critical functions such as memory management, real-time task scheduling, and process interactions. For instance, the Memory Management Community focuses on memory allocation, deallocation, and error handling. Overall, this level integrates these essential operations, presenting a comprehensive view of the mechanisms that underpin system performance.",
+    "summary": "This level represents a foundational layer of the hierarchy, containing detailed and specific technical information about individual communities. Each community focuses on precise processes and interactions within the system, providing deep insights into specific operational areas. These communities provide granular information on operations like memory management, real-time scheduling, and process coordination. Overall, the communities at this level emphasize detailed, granular system functions and play a crucial role in the effective operation of complex computing environments.",
     "rate": 7.8,
     "rating_explanation": "The importance of this level is moderately high due to the essential role these systems play in ensuring the stability and efficiency of larger computing operations."
 }}
@@ -333,6 +335,96 @@ Style the response in json format, and ensure that all sections and details matc
 
 Output:"""
 
+
+LEVEL_INFERENCE_PROMPT = """
+# Role
+
+You are an AI assistant that helps a human analyst evaluate the importance of each level within a hierarchical structure, based on the provided indexed information and the user's query.
+
+
+# Goal
+
+Given the hierarchical index data for a specific structure, you are tasked with determining the relevance and significance of each indexed level in relation to the user's query. For each level, provide an importance score and a brief explanation for the given score. Your response should be grounded in the provided indexed data and avoid unsupported conclusions. It is important to note that the provided index information has been pre-filtered and may not always be directly related to the query.
+
+# Report Structure
+
+The Report should include a list (`finds`) containing dictionaries that reflect the importance of each level. Each dictionary should include the following fields:
+- ID: The unique identifier of the indexed level.
+- RATE: A float score between 0-10 that represents the importance of this level in addressing the user's query.
+- RATING EXPLANATION: A short explanation justifying the given importance score.
+
+Return output as a well-formed JSON-formatted string with the following format:
+{{
+    "finds": [
+        {{
+            "id": <level_id>,
+            "rate": <importance_score>,
+            "rating_explanation": <rating_explanation>
+        }}
+    ]
+}}
+
+
+# Example Input
+-----------
+
+Max level: 3
+Indexed Data:
+
+level_id, community_number, level_summary, community_example  
+1, 92, "This level provides highly detailed and specific information about communities, focusing on particular processes and interactions within systems.", {{"title": "File System Community", "summary": "The File System Community is focused on the processes involved in reading, writing, and managing data storage within a file system, including disk management, file allocation tables, and error handling mechanisms."}}
+2, 34, "This level presents a moderate level of abstraction, capturing broader relationships between system components, but still retaining specificity in how various subsystems interact.", {{"title": "Memory and Process Management Community", "summary": "This community revolves around the interaction between memory allocation systems and process scheduling, detailing how operating systems optimize resource usage and prevent deadlocks."}}  
+3, 8, "This level offers an overarching view of system architecture, summarizing how different core components of the operating system work together to maintain performance and stability.", {{"title": "Operating System Core Community", "summary": "This community deals with the overall architecture of operating systems, covering key aspects such as kernel functionality, inter-process communication, and system resource management at a high level."}}
+
+Query: "How can we optimize system performance when dealing with high-volume network traffic?"
+
+# Output:
+{{
+    "finds": [
+        {{
+            "id": 1,
+            "rate": 9.0,
+            "rating_explanation": "This level contains highly specific technical details about network traffic management, including processes such as buffer overflow and congestion control, which are critical in optimizing performance for high-volume traffic."
+        }},
+        {{
+            "id": 2,
+            "rate": 7.5,
+            "rating_explanation": "This level covers system-level communication processes, which are essential for managing data flow and ensuring efficient communication between components, although not as detailed as lower levels."
+        }},
+        {{
+            "id": 3,
+            "rate": 6.0,
+            "rating_explanation": "This level addresses more abstract strategies for system performance optimization, but lacks the detailed technical focus needed for specific network traffic optimization."
+        }}
+    ]
+}}
+
+# Real Data
+
+Use the following indexed data for your response. Do not create or assume any additional information.
+
+Indexed Data:
+
+{indexed_structure_data}
+
+The Report should include a list (`finds`) containing dictionaries that reflect the importance of each level. Each dictionary should include the following fields:
+- ID: The unique identifier of the indexed level.
+- RATE: A float score between 0-10 that represents the importance of this level in addressing the user's query.
+- RATING EXPLANATION: A short explanation justifying the given importance score.
+
+Return output as a well-formed JSON-formatted string with the following format:
+{{
+    "finds": [
+        {{
+            "id": <level_id>,
+            "rate": <importance_score>,
+            "rating_explanation": <rating_explanation>
+        }}
+    ]
+}}
+
+Output:
+"""
 
 
 # The following prompts are from the GlobalRAG's search of Microsoft.

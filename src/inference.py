@@ -13,11 +13,18 @@ def hcarag(
     hc_index: faiss.IndexHCHNSWFlat,
     entity_df,
     community_df,
+    level_summary_df,
     query_paras,
     args,
 ):
     entity_context, community_context = hcarag_retrieval(
-        query_content, hc_index, entity_df, community_df, query_paras, args
+        query_content,
+        hc_index,
+        entity_df,
+        community_df,
+        level_summary_df,
+        query_paras,
+        args,
     )
 
     response_report = hcarag_inference(
@@ -31,9 +38,11 @@ def hcarag_retrieval(
     hc_index: faiss.IndexHCHNSWFlat,
     entity_df,
     community_df,
+    level_summary_df,
     query_paras,
     args,
 ):
+    query_paras["query_content"] = query_content
     query_embedding = openai_embedding(
         query_content,
         args.embedding_api_key,
@@ -53,7 +62,14 @@ def hcarag_retrieval(
         query_embedding = np.expand_dims(query_embedding, axis=0)
 
     hc_level = hc_index.hchnsw.max_level
-    final_k, k_per_level = load_strategy(query_paras, hc_level + 1)
+    final_k, k_per_level = load_strategy(
+        query_paras=query_paras,
+        number_levels=hc_level + 1,
+        entity_df=entity_df,
+        community_df=community_df,
+        level_summary_df=level_summary_df,
+        args=args,
+    )
 
     all_results = []
 
@@ -67,7 +83,7 @@ def hcarag_retrieval(
         # 将 numpy 数组展平成一维，并添加到 all_results 中
         distances_flat = distances.flatten()
         preds_flat = preds.flatten()
-        
+
         for dist, pred in zip(distances_flat, preds_flat):
             all_results.append((dist, pred))
 
@@ -138,7 +154,14 @@ def hcarag_inference(
     return response_report
 
 
-def load_strategy(query_paras, number_levels):
+def load_strategy(
+    query_paras,
+    number_levels,
+    entity_df: pd.DataFrame,
+    community_df: pd.DataFrame,
+    level_summary_df: pd.DataFrame,
+    args,
+):
 
     strategy = query_paras["strategy"]
     if strategy == "global":
@@ -149,13 +172,62 @@ def load_strategy(query_paras, number_levels):
         return k_final, k_per_level
     elif strategy == "inference":
         k_final = query_paras["k_final"]
-        #  TODO 实现 inference 策略和每层的level数值
+
+        level_weight, raw_result = problem_reasoning(
+            query_content=query_paras["query_content"],
+            entity_df=entity_df,
+            community_df=community_df,
+            level_summary_df=level_summary_df,
+            max_level=number_levels - 1,
+            max_retries=args.max_retries,
+            args=args,
+        )
+
         times = query_paras["inference_search_times"]
         all_k = times * k_final
-        k_per_level = [all_k] * number_levels
+
+        k_per_level = calculate_k_per_level(level_weight, all_k)
+        
+        print("inference k per level is:")
+        for k in k_per_level:
+            print(k, end='; ')
         return k_final, k_per_level
     else:
         raise ValueError("Invalid strategy.")
+
+
+def calculate_k_per_level(level_weight, all_k):
+    total_weight = sum(level_weight)
+
+    # 计算每层的 k 值并四舍五入为整数
+    k_per_level = [round(weight / total_weight * all_k) for weight in level_weight]
+
+    # 调整 k_per_level 以确保总和为 all_k
+    current_sum = sum(k_per_level)
+    while current_sum != all_k:
+        # 找到需要增加或减少的数量
+        difference = all_k - current_sum
+
+        # 确保我们在调整时只对 k_per_level 中的某一层进行加一或减一
+        if difference > 0:
+            # 增加
+            for i in range(len(k_per_level)):
+                if difference <= 0:
+                    break
+                k_per_level[i] += 1
+                difference -= 1
+        else:
+            # 减少
+            for i in range(len(k_per_level)):
+                if difference >= 0:
+                    break
+                if k_per_level[i] > 0:  # 确保不减到负数
+                    k_per_level[i] -= 1
+                    difference += 1
+
+        current_sum = sum(k_per_level)
+
+    return k_per_level
 
 
 def load_index(args):
@@ -168,21 +240,36 @@ def load_index(args):
     community_path = os.path.join(args.output_dir, "community_df_index.csv")
     community_df = pd.read_csv(community_path)
 
-    return hc_index, entity_df, community_df
+    level_summary_path = os.path.join(args.output_dir, "level_summary.csv")
+    level_summary_df = pd.read_csv(level_summary_path)
+
+    return hc_index, entity_df, community_df, level_summary_df
 
 
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
-    hc_index, entity_df, community_df = load_index(args)
+    hc_index, entity_df, community_df, level_summary_df = load_index(args)
     test_question = "What is the usage and value of TLB in an Operating System?"
+    # query_paras = {
+    #     "strategy": "global",
+    #     "k_each_level": 5,
+    #     "k_final": 10,
+    #     "inference_search_times": 2,
+    # }
     query_paras = {
-        "strategy": "global",
+        "strategy": "inference",
         "k_each_level": 5,
         "k_final": 10,
         "inference_search_times": 2,
     }
     response = hcarag(
-        test_question, hc_index, entity_df, community_df, query_paras, args
+        test_question,
+        hc_index,
+        entity_df,
+        community_df,
+        level_summary_df,
+        query_paras,
+        args,
     )
     print(response["response"])
