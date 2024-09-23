@@ -1,5 +1,7 @@
 import tiktoken
 import argparse
+import random
+import faiss
 import networkx as nx
 import pandas as pd
 import numpy as np
@@ -17,13 +19,9 @@ def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int
 def read_graph_nx(file_path: str):
     """Read graph from file."""
     data_path = Path(file_path)
-    final_nodes = pd.read_parquet(data_path / "create_final_nodes.parquet")
-    final_text_units = pd.read_parquet(data_path / "create_final_text_units.parquet")
     final_relationships = pd.read_parquet(
         data_path / "create_final_relationships.parquet"
     )
-    base_entity_graph = pd.read_parquet(data_path / "create_base_entity_graph.parquet")
-
     final_entities = pd.read_parquet(data_path / "create_final_entities.parquet")
 
     # print(final_entities.head())
@@ -50,12 +48,50 @@ def embedding_similarity(emb_1, emb_2):
     return 1 - cosine(emb_1, emb_2)
 
 
-def compute_distance(graph):
-    """Compute distance between all nodes in the graph."""
+def build_faiss_hnsw_index(graph, embedding_dim):
+    """
+    Build a Faiss HNSW index for the graph node embeddings.
+
+    :param graph: A NetworkX graph where each node has an 'embedding' attribute.
+    :param embedding_dim: The dimension of the node embeddings.
+    :return: A Faiss HNSW index with node embeddings.
+    """
+    # Create the HNSW index
+    hnsw_index = faiss.IndexHNSWFlat(
+        embedding_dim, 32
+    )  # HNSW index, 32 is the default M parameter
+
+    # Prepare node embeddings for the index
+    embeddings = []
+    node_list = []
+    for node, data in graph.nodes(data=True):
+        embeddings.append(data["embedding"])
+        node_list.append(node)
+
+    # Convert embeddings to a numpy array
+    embeddings = np.array(embeddings, dtype=np.float32)
+
+    # Add the embeddings to the HNSW index
+    hnsw_index.add(embeddings)
+
+    return hnsw_index, node_list
+
+
+def compute_distance(graph, x_percentile=0.7, search_k=1.5):
+    """
+    Compute the distance between all nodes in the graph and enhance the graph by adding more edges.
+
+    :param graph: Original graph where nodes have 'embedding' attributes.
+    :param x_percentile: The percentile for the edge weight threshold.
+    :param search_k: Scaling factor to determine how many nodes to search for adding edges.
+    :return: A new graph with enhanced connections
+    """
     res_graph = nx.Graph()
 
     res_graph.add_nodes_from(graph.nodes)
 
+    # Step 1: Compute the initial graph with cosine similarity as weights.
+    all_weights = []
     for n1 in graph.nodes():
         n1_emb = graph.nodes[n1]["embedding"]
         for neighbor in graph.neighbors(n1):
@@ -64,6 +100,72 @@ def compute_distance(graph):
                 cos_res = embedding_similarity(n1_emb, nei_emb)
                 # 将边和余弦相似度结果添加到新图中
                 res_graph.add_edge(n1, neighbor, weight=cos_res)
+                all_weights.append(cos_res)
+
+    original_edges_count = res_graph.number_of_edges()
+    initial_isolates = len(list(nx.isolates(graph)))
+
+    # Step 2: Calculate x-percentile weight wx
+    wx = np.percentile(all_weights, x_percentile * 100)
+
+    # Step 3: Calculate the average degree (m_du) of non-isolated nodes
+    degrees = [deg for node, deg in res_graph.degree() if deg > 0]
+    if degrees:
+        m_du = int(sum(degrees) / len(degrees))
+    else:
+        m_du = int(np.sqrt(len(graph.nodes)) / 2)
+
+    search_nodes = int(search_k * m_du) + 1
+
+    # Step 4: Enhance the graph by adding new edges
+    embedding_dim = len(
+        graph.nodes[next(iter(graph.nodes))]["embedding"]
+    )  # Get embedding dimension
+    hnsw_index, node_list = build_faiss_hnsw_index(graph, embedding_dim)
+
+    for u in graph.nodes():
+        u_emb = np.array(graph.nodes[u]["embedding"], dtype=np.float32)
+
+        # Ensure u_emb is (1, dim) shape for Faiss
+        u_emb = np.expand_dims(u_emb, axis=0)  # Convert (dim,) to (1, dim)
+
+        # Use Faiss HNSW to find the k+1 nearest neighbors (including itself)
+        D, I = hnsw_index.search(u_emb, search_nodes)
+        neighbor_indices = I[0]
+
+        # Filter out the node itself from neighbors
+        neighbor_indices = [
+            node_idx for node_idx in neighbor_indices if node_idx != node_list.index(u)
+        ]
+
+        # Calculate cosine similarity and add edges if similarity > wx
+        new_edges = []
+        for v_idx in neighbor_indices:
+            v = node_list[v_idx]
+            if not res_graph.has_edge(u, v):
+                v_emb = graph.nodes[v]["embedding"]
+                cos_sim = embedding_similarity(u_emb.flatten(), v_emb)
+
+                if cos_sim > wx:
+                    new_edges.append((u, v, cos_sim))
+
+        # Sort the new edges by similarity and add up to m_du edges
+        new_edges = sorted(new_edges, key=lambda x: x[2], reverse=True)
+        for i in range(min(len(new_edges), int(m_du))):
+            u, v, weight = new_edges[i]
+            res_graph.add_edge(u, v, weight=weight)
+
+    # Print the final graph statistics
+    final_edges_count = res_graph.number_of_edges()
+    total_added_edges = final_edges_count - original_edges_count
+
+    print(f"Original edges count: {original_edges_count}", end=", ")
+    print(f"New edges added: {total_added_edges}", end=", ")
+    print(f"Total edges in final graph: {final_edges_count}")
+
+    final_isolates = len(list(nx.isolates(res_graph)))
+    print(f"Initial number of isolated nodes: {initial_isolates}", end=", ")
+    print(f"Final number of isolated nodes: {final_isolates}")
 
     return res_graph
 

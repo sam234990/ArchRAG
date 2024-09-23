@@ -347,8 +347,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
-    cos_graph = compute_distance(graph=graph)
-    print("finish compute cos graph")
     community_df = attr_cluster(
         init_graph=graph,
         final_entities=final_entities,
