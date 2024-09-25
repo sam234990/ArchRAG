@@ -5,26 +5,50 @@ import faiss
 import os
 import pandas as pd
 import ast
+from concurrent.futures import ProcessPoolExecutor
 
 
-def entity_embedding(final_entities, args):
-    # Initialize the progress bar
-    tqdm.pandas()
+def entity_embedding(final_entities, args, embed_colname="embedding"):
 
     # Define a function that applies openai_embedding to each description
     def compute_embedding(row):
         # Replace community_text with the description in each row
+        if row["description"] is None:
+            row_content = row["name"]
+        else:
+            row_content = row["name"] + " " + row["description"]
         return openai_embedding(
-            row["description"],  # Pass the description as input text
+            row_content,  # Pass the description as input text
             args.embedding_api_key,
             args.embedding_api_base,
             args.embedding_model,
         )
-
-    # Apply the compute_embedding function to each row in the dataframe with a progress bar
-    final_entities["embedding"] = final_entities.progress_apply(
-        compute_embedding, axis=1
-    )
+        
+    print(f"local is {args.embedding_local}")
+    
+    if args.embedding_local:
+        print("Loading local embedding model")
+        model, tokenizer, device = load_sbert(args.embedding_model_local)
+        final_entities["embedding_context"] = final_entities.apply(
+            lambda x: (
+                x["name"] + " " + x["description"]
+                if x["description"] is not None
+                else x["name"]
+            ),
+            axis=1,
+        )
+        texts = final_entities["embedding_context"].tolist()
+        final_entities[embed_colname] = text_to_embedding_batch(
+            model, tokenizer, device, texts
+        )
+        final_entities = final_entities.drop(columns=["embedding_context"])
+    else:
+        # Initialize the progress bar
+        tqdm.pandas()
+        # Apply the compute_embedding function to each row in the dataframe with a progress bar
+        final_entities[embed_colname] = final_entities.progress_apply(
+            compute_embedding, axis=1
+        )
 
     return final_entities
 

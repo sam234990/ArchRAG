@@ -15,7 +15,6 @@ def attribute_hierarchical_clustering(
     cluster_info, community_mapping = compute_leiden_communities(
         graph=weighted_graph,
         max_cluster_size=10,
-        use_lcc=True,
         seed=0xDEADBEEF,
     )
 
@@ -81,7 +80,7 @@ def calculate_community_levels(hier_tree):
 
 
 def compute_leiden_communities(
-    graph: nx.Graph | nx.DiGraph, max_cluster_size: int, use_lcc: bool, seed=0xDEADBEE
+    graph: nx.Graph | nx.DiGraph, max_cluster_size: int, seed=0xDEADBEEF
 ):
     community_mapping = hierarchical_leiden(
         graph, max_cluster_size=max_cluster_size, random_seed=seed, is_weighted=True
@@ -106,20 +105,37 @@ def compute_leiden_communities(
 # then, we get the community report and the corresponding embedding
 # finally, we reconstruct the graph with the community information
 # and use this graph for the next level community computation
-def compute_leiden(graph: nx.Graph, seed=0xDEADBEE):
+def compute_leiden(graph: nx.Graph, seed=0xDEADBEEF) -> dict[str, list[int]]:
     # 使用 leiden 算法计算一层
     community_mapping = leiden(
         graph,
         is_weighted=True,
         random_seed=seed,
     )
-    c_n_mapping: dict[str, list[str]] = {}
+    c_n_mapping: dict[str, list[int]] = {}
 
     for node, community in community_mapping.items():
         community_id = str(community)
         if community_id not in c_n_mapping:
             c_n_mapping[community_id] = []
         c_n_mapping[community_id].append(node)
+
+    return c_n_mapping
+
+
+def compute_leiden_max_size(graph: nx.Graph, max_cluster_size: int, seed=0xDEADBEEF):
+    community_mapping = hierarchical_leiden(
+        graph, max_cluster_size=max_cluster_size, random_seed=seed, is_weighted=True
+    )
+    c_n_mapping: dict[str, list[int]] = {}
+
+    for partition in community_mapping:
+        if not partition.is_final_cluster:
+            continue
+        community_id = str(partition.cluster)
+        if community_id not in c_n_mapping:
+            c_n_mapping[community_id] = []
+        c_n_mapping[community_id].append(partition.node)
 
     return c_n_mapping
 
@@ -141,7 +157,7 @@ def community_id_node_resize(
     community_df["community_nodes"] = community_df["community_nodes"].apply(
         lambda x: ast.literal_eval(x) if isinstance(x, str) else x
     )
-    
+
     # 创建一个新的字典，存放更新后的 community_id 和对应的社区节点
     updated_c_n_mapping = {}
     c_c_mapping = {}
@@ -150,20 +166,22 @@ def community_id_node_resize(
     for community_id, node_list in c_n_mapping.items():
         # 获取 node_list 中每个 node 对应的 title 列表
         community_nodes = []
-        for community_title in node_list:
+        for community_id in node_list:
             ct_nodes = community_df.loc[
-                community_df["title"] == community_title, "community_nodes"
+                community_df["community_id"] == community_id, "community_nodes"
             ]
             if not ct_nodes.empty:
                 # ct_nodes 是一个 Series，取第一个值
-                nodes_list = ct_nodes.iloc[0]
-                
-                if isinstance(nodes_list, list):
-                    community_nodes.extend(nodes_list)
+                community_nodes_list = ct_nodes.iloc[0]
+
+                if isinstance(community_nodes_list, list):
+                    community_nodes.extend(community_nodes_list)
                 else:
-                    print(f"Warning: {community_title} does not have a list of community_nodes")
+                    print(
+                        f"Warning: {community_id} does not have a list of community_nodes"
+                    )
             else:
-                print(f"Warning: {community_title} not found in community_df")
+                print(f"Warning: {community_id} not found in community_df")
 
         # 去重处理
         unique_nodes = list(set(community_nodes))
@@ -190,34 +208,33 @@ def reconstruct_graph(community_df, final_relationships):
             try:
                 embedding = ast.literal_eval(embedding)
             except (ValueError, SyntaxError):
-                print(f"Warning: Unable to parse embedding for {row['title']}")
+                print(
+                    f"Warning: Unable to parse embedding for {row['title']} - {row['community_id']}"
+                )
 
-        if not pd.notna(row["title"]):
-            new_title = "CommunityID" + str(row["community_id"])
-            community_df.loc[idx, "title"] = new_title  # 修改原始 DataFrame 中的 title
-            row["title"] = new_title  # 更新当前迭代的 row 中的 title
-        graph.add_node(row["title"], embedding=embedding)
+        graph.add_node(row["community_id"], embedding=embedding)
 
         community_nodes = row["community_nodes"]
         if isinstance(community_nodes, str):
             try:
                 community_nodes = ast.literal_eval(community_nodes)
             except (ValueError, SyntaxError):
-                print(f"Warning: Unable to parse community_nodes for {row['title']}")
+                print(
+                    f"Warning: Unable to parse community_nodes for {row['title']} - {row['community_id']}"
+                )
                 community_nodes = []
 
         for nodes in community_nodes:
-            node_community_map[nodes] = row["title"]
+            node_community_map[nodes] = row["community_id"]
 
     for _, row in final_relationships.iterrows():
-
-        if row["source"] in node_community_map:
-            source = node_community_map[row["source"]]
+        if row["head_id"] in node_community_map:
+            source = node_community_map[row["head_id"]]
         else:
             continue
 
-        if row["target"] in node_community_map:
-            target = node_community_map[row["target"]]
+        if row["tail_id"] in node_community_map:
+            target = node_community_map[row["tail_id"]]
         else:
             continue
 
@@ -278,10 +295,20 @@ def attr_cluster(
         print(f"Start clustering for level {level}")
 
         # 计算余弦距离图
-        cos_graph = compute_distance(graph)
+        cos_graph = compute_distance(
+            graph,
+            x_percentile=args.wx_weight,
+            search_k=args.search_k,
+            m_du_sacle=args.m_du_scale,
+        )
 
         # 使用 Leiden 算法进行聚类
-        c_n_mapping = compute_leiden(cos_graph, args.seed)
+        if args.max_cluster_size:
+            c_n_mapping = compute_leiden_max_size(
+                cos_graph, args.max_cluster_size, args.seed
+            )
+        else:
+            c_n_mapping = compute_leiden(cos_graph, args.seed)
 
         # 如果不是第一层，需要调整 community_id
         if level > 1:
@@ -324,7 +351,6 @@ def attr_cluster(
                 level_dict=level_dict,
                 args=args,
             )
-            new_community_df = pd.DataFrame(new_community_df)
 
         # update
         graph, new_community_df = reconstruct_graph(

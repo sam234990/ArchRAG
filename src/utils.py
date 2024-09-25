@@ -5,6 +5,7 @@ import faiss
 import networkx as nx
 import pandas as pd
 import numpy as np
+import ast
 from scipy.spatial.distance import cosine
 from pathlib import Path
 
@@ -16,32 +17,65 @@ def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int
     return len(token_encoder.encode(text))  # type: ignore
 
 
-def read_graph_nx(file_path: str):
+def read_graph_nx(
+    file_path: str,
+    relationship_filename: str = "create_final_relationships.parquet",
+    entity_filename: str = "create_final_entities.parquet",
+) -> nx.Graph:
     """Read graph from file."""
     data_path = Path(file_path)
-    final_relationships = pd.read_parquet(
-        data_path / "create_final_relationships.parquet"
-    )
-    final_entities = pd.read_parquet(data_path / "create_final_entities.parquet")
 
-    # print(final_entities.head())
+    # Determine the file extension
+    relationship_file_path = data_path / relationship_filename
+    entity_file_path = data_path / entity_filename
+
+    if relationship_file_path.suffix in [".csv", ".txt"]:
+        relationships = pd.read_csv(relationship_file_path)
+    else:
+        relationships = pd.read_parquet(relationship_file_path)
+
+    if entity_file_path.suffix in [".csv", ".txt"]:
+        final_entities = pd.read_csv(entity_file_path)
+    else:
+        final_entities = pd.read_parquet(entity_file_path)
+
+    if "head_id" not in relationships.columns:
+        name_to_id = dict(
+            zip(final_entities["name"], final_entities["human_readable_id"])
+        )
+        relationships["head_id"] = relationships["source"].map(name_to_id)
+        relationships["tail_id"] = relationships["target"].map(name_to_id)
+
+    # Create a NetworkX graph
     graph = nx.Graph()
     for _, row in final_entities.iterrows():
-        graph.add_node(row["name"], **row.to_dict())
+        # graph.add_node(row["name"], **row.to_dict())
+        graph.add_node(row["human_readable_id"], **row.to_dict())
 
-    for _, row in final_relationships.iterrows():
-        graph.add_edge(row["source"], row["target"], weight=row["weight"])
+    for _, row in relationships.iterrows():
+        # graph.add_edge(row["source"], row["target"], weight=row["weight"])
+        if "weight" in row:
+            graph.add_edge(row["head_id"], row["tail_id"], weight=row["weight"])
+        else:
+            graph.add_edge(row["head_id"], row["tail_id"])
 
-    # 将embedding添加到图的节点属性中
+    # process embedding
+    final_entities["description_embedding"] = final_entities[
+        "description_embedding"
+    ].apply(lambda x: np.array(ast.literal_eval(x)) if isinstance(x, str) else x)
+    # add embedding to graph
     for _, row in final_entities.iterrows():
-        graph.nodes[row["name"]]["embedding"] = row["description_embedding"]
+        # graph.nodes[row["name"]]["embedding"] = row["description_embedding"]
+        graph.nodes[row["human_readable_id"]]["embedding"] = row[
+            "description_embedding"
+        ]
 
     print(f"Number of nodes: {graph.number_of_nodes()}")
     print(f"Number of edges: {graph.number_of_edges()}")
     ent_embedding_sample = final_entities.loc[0, "description_embedding"]
     print(f"embedding sample:{ent_embedding_sample.shape}")
 
-    return graph, final_entities, final_relationships
+    return graph, final_entities, relationships
 
 
 def embedding_similarity(emb_1, emb_2):
@@ -77,7 +111,7 @@ def build_faiss_hnsw_index(graph, embedding_dim):
     return hnsw_index, node_list
 
 
-def compute_distance(graph, x_percentile=0.7, search_k=1.5):
+def compute_distance(graph, x_percentile=0.7, search_k=1.5, m_du_sacle=1):
     """
     Compute the distance between all nodes in the graph and enhance the graph by adding more edges.
 
@@ -115,7 +149,10 @@ def compute_distance(graph, x_percentile=0.7, search_k=1.5):
     else:
         m_du = int(np.sqrt(len(graph.nodes)) / 2)
 
+    m_du = int(m_du * m_du_sacle)
     search_nodes = int(search_k * m_du) + 1
+
+    print(f"Adding up to {m_du} edges to each node, searching {search_nodes} nodes")
 
     # Step 4: Enhance the graph by adding new edges
     embedding_dim = len(
@@ -184,11 +221,46 @@ def create_arg_parser():
     )
 
     parser.add_argument(
+        "--relationship_filename",
+        type=str,
+        default="create_final_relationships.parquet",
+        help="Filename for the relationship data.",
+    )
+
+    parser.add_argument(
+        "--entity_filename",
+        type=str,
+        default="create_final_entities.parquet",
+        help="Filename for the entity data.",
+    )
+
+    parser.add_argument(
         "--output_dir",
         type=str,
         # required=True,
-        default="/home/wangshu/rag/hier_graph_rag/datasets_io",
+        default="/home/wangshu/rag/hier_graph_rag/test/debug_file",
         help="Output dir path for index",
+    )
+
+    parser.add_argument(
+        "--wx_weight",
+        type=float,
+        default=0.7,
+        help="The percentile for the edge weight threshold",
+    )
+
+    parser.add_argument(
+        "--search_k",
+        type=float,
+        default=1.5,
+        help="Scaling factor to determine how many nodes to search for adding edges",
+    )
+
+    parser.add_argument(
+        "--m_du_scale",
+        type=float,
+        default=1,
+        help="Scaling factor to determine the average degree of non-isolated nodes",
     )
 
     # attr clustering parameters
@@ -214,7 +286,14 @@ def create_arg_parser():
         help="Set the number of minimum cluster in the top level for attribute clustering",
     )
 
-    # 添加参数
+    parser.add_argument(
+        "--max_cluster_size",
+        type=int,
+        default=15,
+        help="Set the maximum size of the cluster",
+    )
+
+    # add LLM parameters
     parser.add_argument(
         "--api_key",
         type=str,
@@ -256,6 +335,20 @@ def create_arg_parser():
     )
 
     parser.add_argument(
+        "--embedding_local",
+        type=bool,
+        default=False,
+        help="Whether to use local embeddings or not",
+    )
+
+    parser.add_argument(
+        "--embedding_model_local",
+        type=str,
+        default="nomic-embed-text-v1",
+        help="Model engine to be used for embeddings. Example values: 'sbert', 'contriever'",
+    )
+
+    parser.add_argument(
         "--embedding_model",
         type=str,
         # required=True,
@@ -275,6 +368,13 @@ def create_arg_parser():
         # required=True,
         default="http://localhost:11434/v1",
         help="Base URL for the API service",
+    )
+    
+    parser.add_argument(
+        "--entity_second_embedding",
+        type=bool,
+        default=True,
+        help="Whether to use second entity embedding or not",
     )
 
     return parser

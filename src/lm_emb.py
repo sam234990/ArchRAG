@@ -10,8 +10,11 @@ import openai
 from openai import OpenAI
 
 
-pretrained_repo = "/mnt/data/wangshu/all-roberta-large-v1"
-batch_size = 256  # Adjust the batch size as needed
+# pretrained_repo = "/mnt/data/wangshu/all-roberta-large-v1"
+
+pretrained_repo = {
+    "nomic-embed-text-v1": "/mnt/data/grouph_share/transformer_llm/nomic-embed-text-v1"
+}
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -37,10 +40,14 @@ class Dataset(torch.utils.data.Dataset):
 
 class Sentence_Transformer(nn.Module):
 
-    def __init__(self, pretrained_repo):
+    def __init__(self, pretrained_repo, trust_remote_code=True):
         super(Sentence_Transformer, self).__init__()
         print(f"inherit model weights from {pretrained_repo}")
-        self.bert_model = AutoModel.from_pretrained(pretrained_repo)
+        self.bert_model = AutoModel.from_pretrained(
+            pretrained_repo,
+            trust_remote_code=trust_remote_code,
+            cache_dir=pretrained_repo,
+        )
 
     def mean_pooling(self, model_output, attention_mask):
         token_embeddings = model_output[
@@ -62,19 +69,27 @@ class Sentence_Transformer(nn.Module):
         return sentence_embeddings
 
 
-def load_sbert():
+def load_sbert(model_name):
 
-    model = Sentence_Transformer(pretrained_repo)
-    tokenizer = AutoTokenizer.from_pretrained(pretrained_repo)
+    print("loading model...")
+
+    tokenizer = AutoTokenizer.from_pretrained(pretrained_repo[model_name])
+    model = Sentence_Transformer(pretrained_repo[model_name], trust_remote_code=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
+    # Wrap the model with DataParallel
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model.bert_model)
+
     model.eval()
+    print(f"Using device: {device}")
+    print("finished loading model")
     return model, tokenizer, device
 
 
-def sber_text2embedding(model, tokenizer, device, text):
+def sber_text2embedding(model, tokenizer, device, text, batch_size=16):
     try:
         encoding = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
         dataset = Dataset(
@@ -111,6 +126,70 @@ def sber_text2embedding(model, tokenizer, device, text):
     return all_embeddings
 
 
+def text_to_embedding_batch(model, tokenizer, device, texts, batch_size=32, embedding_dim=1024):
+    """
+    Encode a list of texts into embeddings using a specified model and tokenizer.
+
+    Args:
+        model: The model used for embedding.
+        tokenizer: The tokenizer corresponding to the model.
+        texts: List of texts to be encoded.
+        batch_size: Number of samples per batch (default: 32).
+        embedding_dim: Dimension of the output embeddings (default: 1024).
+
+    Returns:
+        Tensor of shape (n_samples, embedding_dim) containing the embeddings.
+    """
+    if isinstance(model, nn.DataParallel):
+        # 如果是 DataParallel，访问内部的原始模型
+        if hasattr(model.module, "bert_model"):
+            embedding_dim = model.module.bert_model.config.hidden_size
+        else:
+            embedding_dim = 768  # 默认值
+    else:
+        # 如果不是 DataParallel，直接检查模型
+        if hasattr(model, "bert_model"):
+            embedding_dim = model.bert_model.config.hidden_size
+        else:
+            embedding_dim = 768  # 默认值
+
+    try:
+        # Tokenize the texts
+        encoding = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
+        dataset = Dataset(
+            input_ids=encoding.input_ids, attention_mask=encoding.attention_mask
+        )
+
+        # DataLoader
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+        # Placeholder for storing the embeddings
+        all_embeddings = []
+
+        # Iterate through batches
+        with torch.no_grad():
+            for batch in tqdm(dataloader, desc="Encoding batches"):
+                # Move batch to the appropriate device
+                batch = {key: value.to(device) for key, value in batch.items()}
+
+                # Forward pass
+                embeddings = model(
+                    input_ids=batch["input_ids"], att_mask=batch["att_mask"]
+                )
+
+                # Append the embeddings to the list
+                all_embeddings.append(embeddings)
+
+        # Concatenate the embeddings from all batches
+        all_embeddings = torch.cat(all_embeddings, dim=0).cpu()
+
+    except Exception as e:
+        print(f"Error during embedding: {e}")
+        return torch.zeros((0, embedding_dim))
+
+    return all_embeddings
+
+
 def load_contriever():
     print("Loading contriever model...")
     tokenizer = AutoTokenizer.from_pretrained("facebook/contriever")
@@ -124,7 +203,7 @@ def load_contriever():
     return model, tokenizer, device
 
 
-def contriever_text2embedding(model, tokenizer, device, text):
+def contriever_text2embedding(model, tokenizer, device, text, batch_size=16):
 
     def mean_pooling(token_embeddings, mask):
         token_embeddings = token_embeddings.masked_fill(~mask[..., None].bool(), 0.0)
@@ -199,11 +278,8 @@ load_text2embedding = {
 
 if __name__ == "__main__":
     test_text = "What is the capital of France?"
-    test_embedding = openai_embedding(
-        input_text=test_text,
-        api_key="ollama",
-        api_base="http://localhost:11434/v1",
-        engine="nomic-embed-text",
-    )
+    model, tokenizer, device = load_sbert("nomic-embed-text-v1")
+    test_text = [test_text]
+    test_embedding = text_to_embedding_batch(model, tokenizer, device, test_text)
     print("the shape of the embedding is: ", len(test_embedding))
     print("the first 10 elements of the embedding are: ", test_embedding[:10])

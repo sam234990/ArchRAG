@@ -42,7 +42,7 @@ def prep_community_report_context(
 
         # Filter entities involved in the selected relationships
         involved_entity_ids = pd.concat(
-            [selected_relationships["source"], selected_relationships["target"]]
+            [selected_relationships["head_id"], selected_relationships["tail_id"]]
         ).unique()
         selected_entities = community_nodes[
             community_nodes["human_readable_id"].isin(involved_entity_ids)
@@ -154,15 +154,53 @@ def report_embedding(community_report, community_text, args):
     return community_report
 
 
+def reprot_embedding_batch(community_df, args):
+    def embedding_context(row):
+        if row["summary"] is None:
+            row["embedding_context"] = row["title"] + row["community_text"]
+        else:
+            row["embedding_context"] = row["title"] + row["summary"]
+
+    community_df = community_df.apply(embedding_context, axis=1)
+
+    if args.embedding_local:
+        model, tokenizer, device = load_sbert(args.embedding_model_local)
+
+        # 计算 embeddings
+        texts = community_df["embedding_context"].tolist()
+        community_df["embedding"] = text_to_embedding_batch(
+            model, tokenizer, device, texts
+        )
+    else:
+        for i, row in community_df.iterrows():
+            community_df.at[i, "embedding"] = openai_embedding(
+                row["embedding_context"],
+                args.embedding_api_key,
+                args.embedding_api_base,
+                args.embedding_model,
+            )
+
+    community_df = community_df.drop(columns=["embedding_context"], inplace=True)
+    return community_df
+
+
 def community_report_worker(
     community_id, node_list, final_entities, final_relationships, args, level_dict
 ):
     # 处理单个社区的函数
     print(f"Community {community_id}:")
-    community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
-    community_relationships = final_relationships[
-        final_relationships["source"].isin(node_list)
+    # community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
+    community_nodes = final_entities.loc[
+        final_entities["human_readable_id"].isin(node_list)
     ]
+
+    # community_relationships = final_relationships[
+    #     final_relationships["source"].isin(node_list)
+    # ]
+    community_relationships = final_relationships[
+        final_relationships["head_id"].isin(node_list)
+    ]
+
     community_text = prep_community_report_context(
         0, community_nodes, community_relationships, max_tokens=args.max_tokens
     )
@@ -177,17 +215,21 @@ def community_report_worker(
     )  # 使用 level_dict 获取对应的 level
     community_report["community_nodes"] = node_list
     community_report["raw_result"] = raw_result
+    community_report["community_text"] = community_text
 
-    if raw_result is None or community_report is None:
-        # use the community text as the embedding alternatively
-        community_report["embedding"] = openai_embedding(
-            community_text,
-            args.embedding_api_key,
-            args.embedding_api_base,
-            args.embedding_model,
-        )
-    else:
-        community_report = report_embedding(community_report, community_text, args)
+    if not community_report.get("title"):
+        community_report["title"] = f"CommunityID{community_id}"
+
+    # if raw_result is None or community_report is None:
+    #     # use the community text as the embedding alternatively
+    #     community_report["embedding"] = openai_embedding(
+    #         community_text,
+    #         args.embedding_api_key,
+    #         args.embedding_api_base,
+    #         args.embedding_model,
+    #     )
+    # else:
+    #     community_report = report_embedding(community_report, community_text, args)
 
     return community_report
 
@@ -220,13 +262,17 @@ def community_report_batch(
     pool.close()  # 关闭进程池
     pool.join()  # 等待所有进程完成
 
-    return results_community
+    community_df = pd.DataFrame(results_community)
+    community_df = reprot_embedding_batch(community_df, args)
+    
+    return community_df
 
 
 def community_report_for_level(
     results_by_level, args, final_entities, final_relationships
 ):
     results_community = []
+
     for level, communities in results_by_level.items():
         print(f"Create community report for level: {level} ")
         print(f"Number of communities in this level: {len(communities)}")
@@ -240,9 +286,11 @@ def community_report_for_level(
             args=args,
             level_dict=level_dict,
         )
-        results_community.extend(res)
 
-    community_df = pd.DataFrame(results_community)
+        results_community.append(res)  # 将 DataFrame 添加到列表中
+
+    # 使用 pd.concat 合并所有 DataFrame
+    community_df = pd.concat(results_community, ignore_index=True)
     return community_df
 
 
