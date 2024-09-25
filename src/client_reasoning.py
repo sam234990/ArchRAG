@@ -154,7 +154,7 @@ community_id, title, summary \n"""
     level_df = community_df[community_df["level"] == level]
 
     # 随机选择 sample_size 个样本
-    sampled_df = level_df.sample(n=sample_size, random_state=42)
+    sampled_df = level_df.sample(n=min(level_df.shape[0], sample_size), random_state=42)
 
     res_level_context = ""
     # 遍历 sampled_df 并填充 community_id, title, summary 到字符串中

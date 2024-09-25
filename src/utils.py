@@ -10,6 +10,14 @@ from scipy.spatial.distance import cosine
 from pathlib import Path
 
 
+docker_list = [
+    "http://localhost:8876/v1",
+    "http://localhost:8877/v1",
+    "http://localhost:8878/v1",
+    "http://localhost:8879/v1",
+]
+
+
 def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int:
     """Return the number of tokens in the given text."""
     if token_encoder is None:
@@ -369,7 +377,7 @@ def create_arg_parser():
         default="http://localhost:11434/v1",
         help="Base URL for the API service",
     )
-    
+
     parser.add_argument(
         "--entity_second_embedding",
         type=bool,

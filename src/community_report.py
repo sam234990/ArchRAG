@@ -1,6 +1,7 @@
 import json
 import multiprocessing as mp
 from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 
 from llm import llm_invoker
 from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
@@ -78,9 +79,23 @@ def extract_community_report(result, community_id):
         return {
             "title": result["title"],
             "summary": result["summary"],
-            "findings": result["findings"],
-            "rating": result["rating"],
-            "rating_explanation": result["rating_explanation"],
+            "findings": result.get("findings"),
+            "rating": result.get("rating"),
+            "rating_explanation": result.get("rating_explanation"),
+        }, True
+    # Weak check for title and summary
+    elif (
+        "title" in result
+        and result["title"]
+        and "summary" in result
+        and result["summary"]
+    ):
+        return {
+            "title": result["title"],
+            "summary": result["summary"],
+            "findings": result.get("findings"),
+            "rating": result.get("rating"),
+            "rating_explanation": result.get("rating_explanation"),
         }, True
     else:
         return {
@@ -154,12 +169,13 @@ def report_embedding(community_report, community_text, args):
     return community_report
 
 
-def reprot_embedding_batch(community_df, args):
+def reprot_embedding_batch(community_df, args, num_workers=32):
     def embedding_context(row):
         if row["summary"] is None:
             row["embedding_context"] = row["title"] + row["community_text"]
         else:
             row["embedding_context"] = row["title"] + row["summary"]
+        return row
 
     community_df = community_df.apply(embedding_context, axis=1)
 
@@ -172,66 +188,99 @@ def reprot_embedding_batch(community_df, args):
             model, tokenizer, device, texts
         )
     else:
-        for i, row in community_df.iterrows():
-            community_df.at[i, "embedding"] = openai_embedding(
-                row["embedding_context"],
-                args.embedding_api_key,
-                args.embedding_api_base,
-                args.embedding_model,
+        ori_arg_base_url = args.embedding_api_base
+
+        def get_embedding(row, port_queue):
+            port = port_queue.get()  # 获取可用的端口
+            args.embedding_api_base = docker_list[port]
+            try:
+                return openai_embedding(
+                    row["embedding_context"],
+                    args.embedding_api_key,
+                    args.embedding_api_base,
+                    args.embedding_model,
+                )
+            finally:
+                port_queue.put(port) 
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+
+            # 将可用的端口放入队列中
+            manager = mp.Manager()
+            port_queue = manager.Queue()
+            for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
+                for port in range(4):  # 端口范围 0, 1, 2, 3
+                    port_queue.put(port)
+
+            embeddings = list(
+                executor.map(
+                    lambda row: get_embedding(row, port_queue),
+                    [row for _, row in community_df.iterrows()],
+                )
             )
 
-    community_df = community_df.drop(columns=["embedding_context"], inplace=True)
+        # 将结果添加回 DataFrame
+        community_df["embedding"] = embeddings
+
+        args.embedding_api_base = ori_arg_base_url
+
+    community_df = community_df.drop(columns=["embedding_context"])
+    print('finish compute report batch embedding')
+    print(community_df.shape)
     return community_df
 
 
 def community_report_worker(
-    community_id, node_list, final_entities, final_relationships, args, level_dict
+    community_id,
+    node_list,
+    final_entities,
+    final_relationships,
+    args,
+    level_dict,
+    port_queue,
 ):
-    # 处理单个社区的函数
-    print(f"Community {community_id}:")
-    # community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
-    community_nodes = final_entities.loc[
-        final_entities["human_readable_id"].isin(node_list)
-    ]
 
-    # community_relationships = final_relationships[
-    #     final_relationships["source"].isin(node_list)
-    # ]
-    community_relationships = final_relationships[
-        final_relationships["head_id"].isin(node_list)
-    ]
+    # 获取可用的端口
+    port = port_queue.get()
+    args.api_base = docker_list[port]
+    try:
+        # 处理单个社区的函数
+        print(f"Community {community_id}:")
+        # community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
+        community_nodes = final_entities.loc[
+            final_entities["human_readable_id"].isin(node_list)
+        ]
 
-    community_text = prep_community_report_context(
-        0, community_nodes, community_relationships, max_tokens=args.max_tokens
-    )
+        # community_relationships = final_relationships[
+        #     final_relationships["source"].isin(node_list)
+        # ]
+        community_relationships = final_relationships[
+            final_relationships["head_id"].isin(node_list)
+        ]
 
-    raw_result, community_report = generate_community_report(
-        community_text, args, community_id
-    )
+        community_text = prep_community_report_context(
+            0, community_nodes, community_relationships, max_tokens=args.max_tokens
+        )
 
-    community_report["community_id"] = community_id
-    community_report["level"] = level_dict.get(
-        community_id, None
-    )  # 使用 level_dict 获取对应的 level
-    community_report["community_nodes"] = node_list
-    community_report["raw_result"] = raw_result
-    community_report["community_text"] = community_text
+        raw_result, community_report = generate_community_report(
+            community_text, args, community_id
+        )
 
-    if not community_report.get("title"):
-        community_report["title"] = f"CommunityID{community_id}"
+        community_report["community_id"] = community_id
+        community_report["level"] = level_dict.get(
+            community_id, None
+        )  # 使用 level_dict 获取对应的 level
+        community_report["community_nodes"] = node_list
+        community_report["raw_result"] = raw_result
+        community_report["community_text"] = community_text
 
-    # if raw_result is None or community_report is None:
-    #     # use the community text as the embedding alternatively
-    #     community_report["embedding"] = openai_embedding(
-    #         community_text,
-    #         args.embedding_api_key,
-    #         args.embedding_api_base,
-    #         args.embedding_model,
-    #     )
-    # else:
-    #     community_report = report_embedding(community_report, community_text, args)
-
-    return community_report
+        if not community_report.get("title"):
+            community_report["title"] = f"CommunityID{community_id}"
+            
+        return community_report
+    finally:
+        # 将端口放回队列，供其他进程使用
+        port_queue.put(port)
 
 
 def community_report_batch(
@@ -240,31 +289,41 @@ def community_report_batch(
     final_relationships,
     args,
     level_dict: dict[str, int],
-    num_workers=8,
+    num_workers=32,
 ):
     results_community = []
+    ori_arg_base_url = args.api_base
 
-    # 将处理任务分发到各个进程
-    pool = mp.Pool(processes=num_workers)
+    # 创建进程池
+    with mp.Pool(processes=num_workers) as pool:
+        # 将可用的端口放入队列中
+        manager = mp.Manager()
+        port_queue = manager.Queue()
+        for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
+            for port in range(4):  # 端口范围 0, 1, 2, 3
+                port_queue.put(port)
 
-    # 使用partial来将固定的参数传递到worker中
-    process_func = partial(
-        community_report_worker,
-        final_entities=final_entities,
-        final_relationships=final_relationships,
-        args=args,
-        level_dict=level_dict,
-    )
+        # 使用 partial 来将固定的参数传递到 worker 中
+        process_func = partial(
+            community_report_worker,
+            final_entities=final_entities,
+            final_relationships=final_relationships,
+            args=args,
+            level_dict=level_dict,
+            port_queue=port_queue,  # 传递端口队列
+        )
 
-    # 并行处理每个社区
-    results_community = pool.starmap(process_func, communities.items())
+        # 并行处理每个社区
+        results_community = pool.starmap(process_func, communities.items())
 
-    pool.close()  # 关闭进程池
-    pool.join()  # 等待所有进程完成
+    # pool.close()  # 关闭进程池
+    # pool.join()  # 等待所有进程完成
+
+    args.api_base = ori_arg_base_url
 
     community_df = pd.DataFrame(results_community)
     community_df = reprot_embedding_batch(community_df, args)
-    
+
     return community_df
 
 

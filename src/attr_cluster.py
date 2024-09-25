@@ -303,7 +303,7 @@ def attr_cluster(
         )
 
         # 使用 Leiden 算法进行聚类
-        if args.max_cluster_size:
+        if args.max_cluster_size != 0:
             c_n_mapping = compute_leiden_max_size(
                 cos_graph, args.max_cluster_size, args.seed
             )
@@ -371,6 +371,7 @@ def attr_cluster(
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
+    args.max_cluster_size = 0
 
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     community_df = attr_cluster(

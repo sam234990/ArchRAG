@@ -6,26 +6,21 @@ import os
 import pandas as pd
 import ast
 from concurrent.futures import ProcessPoolExecutor
+import multiprocessing as mp
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 
 
-def entity_embedding(final_entities, args, embed_colname="embedding"):
+def entity_embedding(
+    final_entities: pd.DataFrame, args, embed_colname="embedding", num_workers=32
+):
 
-    # Define a function that applies openai_embedding to each description
-    def compute_embedding(row):
-        # Replace community_text with the description in each row
-        if row["description"] is None:
-            row_content = row["name"]
-        else:
-            row_content = row["name"] + " " + row["description"]
-        return openai_embedding(
-            row_content,  # Pass the description as input text
-            args.embedding_api_key,
-            args.embedding_api_base,
-            args.embedding_model,
-        )
-        
+    if embed_colname in final_entities.columns:
+        print(f"column name :{embed_colname} existing")
+        return final_entities
+
     print(f"local is {args.embedding_local}")
-    
+
     if args.embedding_local:
         print("Loading local embedding model")
         model, tokenizer, device = load_sbert(args.embedding_model_local)
@@ -43,12 +38,49 @@ def entity_embedding(final_entities, args, embed_colname="embedding"):
         )
         final_entities = final_entities.drop(columns=["embedding_context"])
     else:
-        # Initialize the progress bar
-        tqdm.pandas()
-        # Apply the compute_embedding function to each row in the dataframe with a progress bar
-        final_entities[embed_colname] = final_entities.progress_apply(
-            compute_embedding, axis=1
-        )
+        # Define a function that applies openai_embedding to each description
+        def compute_embedding(row, port_queue):
+            port = port_queue.get()  # 获取可用的端口
+            args.embedding_api_base = docker_list[port]
+            try:
+                # Replace community_text with the description in each row
+                if row["description"] is None:
+                    row_content = row["name"]
+                else:
+                    row_content = row["name"] + " " + row["description"]
+                return openai_embedding(
+                    row_content,  # Pass the description as input text
+                    args.embedding_api_key,
+                    args.embedding_api_base,
+                    args.embedding_model,
+                )
+            finally:
+                port_queue.put(port)
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+
+            # 将可用的端口放入队列中
+            manager = mp.Manager()
+            port_queue = manager.Queue()
+            for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
+                for port in range(4):  # 端口范围 0, 1, 2, 3
+                    port_queue.put(port)
+
+            embeddings = list(
+                executor.map(
+                    lambda row: compute_embedding(row, port_queue),
+                    [row for _, row in final_entities.iterrows()],
+                )
+            )
+
+        final_entities[embed_colname] = embeddings
+
+        # # Initialize the progress bar
+        # tqdm.pandas()
+        # # Apply the compute_embedding function to each row in the dataframe with a progress bar
+        # final_entities[embed_colname] = final_entities.progress_apply(
+        #     compute_embedding, axis=1
+        # )
 
     return final_entities
 
