@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from utils import create_arg_parser, read_graph_nx
+from utils import create_arg_parser, read_graph_nx, print_args
 from attr_cluster import attr_cluster
 from hchnsw_index import entity_embedding, create_hchnsw_index
 from client_reasoning import level_summary
@@ -33,12 +33,12 @@ def make_hc_index(args):
 
     c_df_save_path = os.path.join(args.output_dir, "community_df_intermediate.csv")
     community_df.to_csv(c_df_save_path, index=False)
-    
+
     if args.entity_second_embedding:
         entities_df: pd.DataFrame = entity_embedding(entities_df, args=args)
     else:
-        entities_df['embedding'] = entities_df['description_embedding']
-        
+        entities_df["embedding"] = entities_df["description_embedding"]
+
     final_community_df, final_entity_df = create_hchnsw_index(
         community_df=community_df, entity_df=entities_df, save_path=args.output_dir
     )
@@ -74,4 +74,5 @@ def make_level_summary(community_df, save_path, args):
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
+    print_args(args)
     make_hc_index(args=args)

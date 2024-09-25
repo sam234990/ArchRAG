@@ -17,7 +17,8 @@ def hcarag(
     query_paras,
     args,
 ):
-    entity_context, community_context = hcarag_retrieval(
+
+    topk_entity, topk_community = hcarag_retrieval(
         query_content,
         hc_index,
         entity_df,
@@ -28,7 +29,12 @@ def hcarag(
     )
 
     response_report = hcarag_inference(
-        entity_context, community_context, query_content, args.max_retries, args
+        topk_entity,
+        topk_community,
+        query_content,
+        args.max_retries,
+        args,
+        query_paras=query_paras,
     )
     return response_report
 
@@ -96,13 +102,51 @@ def hcarag_retrieval(
     # 提取最终的预测值（实体索引）
     final_predictions = [pred for _, pred in final_results]
 
-    # 用于存储提取出的 entity_context 和 community_context
-    entity_context = []
-    community_context = []
-
     # 用于存储 top-k 的实体和社区
     topk_entity = entity_df[entity_df["index_id"].isin(final_predictions)]
     topk_community = community_df[community_df["index_id"].isin(final_predictions)]
+
+    return topk_entity, topk_community
+
+
+def hcarag_inference(
+    topk_entity,
+    topk_community,
+    query,
+    max_retries,
+    args,
+    query_paras,
+):
+    if query_paras["generate_strategy"] == "direct":
+        response_report = hcarag_inference_direct(
+            topk_entity,
+            topk_community,
+            query,
+            max_retries,
+            args,
+        )
+    else:
+        response_report = hcarag_inference_mr(
+            topk_entity,
+            topk_community,
+            query,
+            max_retries,
+            args,
+        )
+    return response_report
+
+
+def hcarag_inference_direct(
+    topk_entity,
+    topk_community,
+    query,
+    max_retries,
+    args,
+):
+
+    # 用于存储提取出的 entity_context 和 community_context
+    entity_context = []
+    community_context = []
 
     # 提取 entity_df 中的 name 和 description 列构成 entity_context
     for idx, row in topk_entity.iterrows():
@@ -111,17 +155,6 @@ def hcarag_retrieval(
     # 提取 community_df 中的 title 和 summary 列构成 community_context
     for idx, row in topk_community.iterrows():
         community_context.append(f"{idx}, {row['title']}, {row['summary']}")
-
-    return entity_context, community_context
-
-
-def hcarag_inference(
-    entity_context,
-    community_context,
-    query,
-    max_retries,
-    args,
-):
 
     content = prep_infer_content(
         entity_context=entity_context,
@@ -151,6 +184,19 @@ def hcarag_inference(
 
     response_report = {"response": response, "raw_result": raw_result}
 
+    return response_report
+
+
+def hcarag_inference_mr(
+    topk_entity,
+    topk_community,
+    query,
+    max_retries,
+    args,
+):
+    raw_result = []
+    response = ""
+    response_report = {"response": response, "raw_result": raw_result}
     return response_report
 
 
@@ -187,10 +233,10 @@ def load_strategy(
         all_k = times * k_final
 
         k_per_level = calculate_k_per_level(level_weight, all_k)
-        
+
         print("inference k per level is:")
         for k in k_per_level:
-            print(k, end='; ')
+            print(k, end="; ")
         return k_final, k_per_level
     else:
         raise ValueError("Invalid strategy.")
@@ -262,6 +308,7 @@ if __name__ == "__main__":
         "k_each_level": 5,
         "k_final": 10,
         "inference_search_times": 2,
+        "generate_strategy": "direct",
     }
     response = hcarag(
         test_question,

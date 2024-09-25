@@ -1,11 +1,16 @@
 import tiktoken
 import argparse
-import random
+
+# import random
 import faiss
+import logging
 import networkx as nx
 import pandas as pd
 import numpy as np
 import ast
+import json
+import re
+from json_repair import repair_json
 from scipy.spatial.distance import cosine
 from pathlib import Path
 
@@ -16,6 +21,8 @@ docker_list = [
     "http://localhost:8878/v1",
     "http://localhost:8879/v1",
 ]
+
+log = logging.getLogger(__name__)
 
 
 def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int:
@@ -215,6 +222,64 @@ def compute_distance(graph, x_percentile=0.7, search_k=1.5, m_du_sacle=1):
     return res_graph
 
 
+def try_parse_json_object(input: str) -> tuple[str, dict]:
+    """JSON cleaning and formatting utilities."""
+    # Sometimes, the LLM returns a json string with some extra description, this function will clean it up.
+
+    result = None
+    try:
+        # Try parse first
+        result = json.loads(input)
+    except json.JSONDecodeError:
+        log.info("Warning: Error decoding faulty json, attempting repair")
+
+    if result:
+        return input, result
+
+    _pattern = r"\{(.*)\}"
+    _match = re.search(_pattern, input)
+    input = "{" + _match.group(1) + "}" if _match else input
+
+    # Clean up json string.
+    input = (
+        input.replace("{{", "{")
+        .replace("}}", "}")
+        .replace('"[{', "[{")
+        .replace('}]"', "}]")
+        .replace("\\", " ")
+        .replace("\\n", " ")
+        .replace("\n", " ")
+        .replace("\r", "")
+        .strip()
+    )
+
+    # Remove JSON Markdown Frame
+    if input.startswith("```json"):
+        input = input[len("```json") :]
+    if input.endswith("```"):
+        input = input[: len(input) - len("```")]
+
+    try:
+        result = json.loads(input)
+    except json.JSONDecodeError:
+        # Fixup potentially malformed json string using json_repair.
+        input = str(repair_json(json_str=input, return_objects=False))
+
+        # Generate JSON-string output using best-attempt prompting & parsing techniques.
+        try:
+            result = json.loads(input)
+        except json.JSONDecodeError:
+            log.exception("error loading json, json=%s", input)
+            return input, {}
+        else:
+            if not isinstance(result, dict):
+                log.exception("not expected dict type. type=%s:", type(result))
+                return input, {}
+            return input, result
+    else:
+        return input, result
+
+
 def create_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for the project."
@@ -324,6 +389,7 @@ def create_arg_parser():
         default="llama3.1:8b",
         help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
     )
+
     parser.add_argument(
         "--max_tokens", type=int, default=4000, help="Maximum tokens to generate"
     )
@@ -386,6 +452,12 @@ def create_arg_parser():
     )
 
     return parser
+
+
+def print_args(args):
+    print("Parsed Arguments:")
+    for arg, value in vars(args).items():
+        print(f"{arg}: {value}")
 
 
 if __name__ == "__main__":

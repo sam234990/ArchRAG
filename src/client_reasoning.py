@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, Any
 from llm import llm_invoker
-from utils import create_arg_parser, num_tokens
+from utils import *
 from prompts import *
 
 
@@ -257,6 +257,39 @@ community_id, title, summary \n
 
     res_content = GENERATION_PROMPT.format(context_data=res_content, user_query=query)
     return res_content.strip()
+
+
+def prep_map_content(
+    entity_context: pd.DataFrame,
+    community_df: pd.DataFrame,
+    query,
+    max_tokens=None,
+) -> str:
+    community_str = """
+id|title|content|rank \n
+"""
+    if not community_df.empty():
+        community_chunk_str = ""
+        for idx, row in community_df.iterrows():
+            community_chunk_str += f"{row['community_id']}|{row['title']}|{row['content']}|{row['rank']}\n"
+            if max_tokens and num_tokens(community_str) > max_tokens:
+                break
+
+    pass
+
+
+def map_inference():
+
+    pass
+
+
+def prep_reduce_content():
+
+    pass
+
+
+def reduce_inference():
+    pass
 
 
 if __name__ == "__main__":
