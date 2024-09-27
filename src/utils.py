@@ -15,13 +15,6 @@ from scipy.spatial.distance import cosine
 from pathlib import Path
 
 
-docker_list = [
-    "http://localhost:8876/v1",
-    "http://localhost:8877/v1",
-    "http://localhost:8878/v1",
-    "http://localhost:8879/v1",
-]
-
 log = logging.getLogger(__name__)
 
 
@@ -379,7 +372,7 @@ def create_arg_parser():
         type=str,
         # required=True,
         help="Base URL for the API service",
-        default="http://localhost:11434/v1",
+        default="http://localhost:5000/forward",
     )
 
     parser.add_argument(
@@ -440,15 +433,22 @@ def create_arg_parser():
         "--embedding_api_base",
         type=str,
         # required=True,
-        default="http://localhost:11434/v1",
+        default="http://localhost:5000/forward",
         help="Base URL for the API service",
     )
 
     parser.add_argument(
         "--entity_second_embedding",
-        type=bool,
+        type=lambda x: x.lower() == "True",
         default=True,
         help="Whether to use second entity embedding or not",
+    )
+
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=32,
+        help="Number of workers to use for parallel processing",
     )
 
     return parser

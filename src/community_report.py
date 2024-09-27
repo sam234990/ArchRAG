@@ -7,60 +7,21 @@ from llm import llm_invoker
 from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
 from utils import *
 from lm_emb import *
+from client_reasoning import prep_e_r_content
 
 
-def trim_community_context(community_nodes, relationships):
-    entity_str = ""
-    for _, row in community_nodes.iterrows():
-        entity_str += f"{row['human_readable_id']},{row['name']},{row['description']}\n"
-    relationships_str = ""
-    for _, row in relationships.iterrows():
-        relationships_str += f"{row['human_readable_id']},{row['source']},{row['target']},{row['description']}\n"
-
-    context = COMMUNITY_CONTEXT.format(
-        entity_df=entity_str, relationship_df=relationships_str
-    )
-    return context
-
-
-def prep_community_report_context(
-    level, community_nodes, relationships, sub_communities_summary=None, max_tokens=None
+def prep_community_report_content(
+    level,
+    community_entities,
+    relationships,
+    sub_communities_summary=None,
+    max_tokens=None,
 ):
-    relationships_sorted = relationships.copy()
-    relationships_sorted["degree_sum"] = (
-        relationships_sorted["source_degree"] + relationships_sorted["target_degree"]
-    )
-    relationships_sorted = relationships_sorted.sort_values(
-        by="degree_sum", ascending=False
+    new_string = prep_e_r_content(
+        community_entities, relationships, max_tokens=max_tokens
     )
 
-    selected_relationships = pd.DataFrame(columns=relationships.columns)
-    selected_entities = pd.DataFrame(columns=community_nodes.columns)
-
-    new_string = ""
-    for i in range(len(relationships_sorted)):
-        selected_relationships = relationships_sorted.iloc[:i]
-
-        # Filter entities involved in the selected relationships
-        involved_entity_ids = pd.concat(
-            [selected_relationships["head_id"], selected_relationships["tail_id"]]
-        ).unique()
-        selected_entities = community_nodes[
-            community_nodes["human_readable_id"].isin(involved_entity_ids)
-        ]
-
-        if max_tokens:
-            context = trim_community_context(selected_entities, selected_relationships)
-            if num_tokens(context) > max_tokens:
-                break
-            new_string = context
-
-    if new_string == "":
-        return trim_community_context(
-            community_nodes=community_nodes, relationships=relationships
-        )
-
-    return new_string
+    return new_string[0]
 
 
 def extract_community_report(result, community_id):
@@ -89,6 +50,8 @@ def extract_community_report(result, community_id):
         and result["title"]
         and "summary" in result
         and result["summary"]
+        and "findings" in result
+        and result["findings"]
     ):
         return {
             "title": result["title"],
@@ -188,33 +151,19 @@ def reprot_embedding_batch(community_df, args, num_workers=32):
             model, tokenizer, device, texts
         )
     else:
-        ori_arg_base_url = args.embedding_api_base
 
-        def get_embedding(row, port_queue):
-            port = port_queue.get()  # 获取可用的端口
-            args.embedding_api_base = docker_list[port]
-            try:
-                return openai_embedding(
-                    row["embedding_context"],
-                    args.embedding_api_key,
-                    args.embedding_api_base,
-                    args.embedding_model,
-                )
-            finally:
-                port_queue.put(port) 
+        def get_embedding(row):
+            return openai_embedding(
+                row["embedding_context"],
+                args.embedding_api_key,
+                args.embedding_api_base,
+                args.embedding_model,
+            )
 
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-
-            # 将可用的端口放入队列中
-            manager = mp.Manager()
-            port_queue = manager.Queue()
-            for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
-                for port in range(4):  # 端口范围 0, 1, 2, 3
-                    port_queue.put(port)
-
             embeddings = list(
                 executor.map(
-                    lambda row: get_embedding(row, port_queue),
+                    lambda row: get_embedding(row),
                     [row for _, row in community_df.iterrows()],
                 )
             )
@@ -222,10 +171,8 @@ def reprot_embedding_batch(community_df, args, num_workers=32):
         # 将结果添加回 DataFrame
         community_df["embedding"] = embeddings
 
-        args.embedding_api_base = ori_arg_base_url
-
     community_df = community_df.drop(columns=["embedding_context"])
-    print('finish compute report batch embedding')
+    print("finish compute report batch embedding")
     print(community_df.shape)
     return community_df
 
@@ -237,50 +184,38 @@ def community_report_worker(
     final_relationships,
     args,
     level_dict,
-    port_queue,
 ):
 
-    # 获取可用的端口
-    port = port_queue.get()
-    args.api_base = docker_list[port]
-    try:
-        # 处理单个社区的函数
-        print(f"Community {community_id}:")
-        # community_nodes = final_entities.loc[final_entities["name"].isin(node_list)]
-        community_nodes = final_entities.loc[
-            final_entities["human_readable_id"].isin(node_list)
-        ]
+    # 处理单个社区的函数
+    print(f"Community {community_id}:")
+    community_entities = final_entities.loc[
+        final_entities["human_readable_id"].isin(node_list)
+    ]
 
-        # community_relationships = final_relationships[
-        #     final_relationships["source"].isin(node_list)
-        # ]
-        community_relationships = final_relationships[
-            final_relationships["head_id"].isin(node_list)
-        ]
+    community_relationships = final_relationships[
+        final_relationships["head_id"].isin(node_list)
+    ]
 
-        community_text = prep_community_report_context(
-            0, community_nodes, community_relationships, max_tokens=args.max_tokens
-        )
+    community_text = prep_community_report_content(
+        0, community_entities, community_relationships, max_tokens=args.max_tokens
+    )
 
-        raw_result, community_report = generate_community_report(
-            community_text, args, community_id
-        )
+    raw_result, community_report = generate_community_report(
+        community_text, args, community_id
+    )
 
-        community_report["community_id"] = community_id
-        community_report["level"] = level_dict.get(
-            community_id, None
-        )  # 使用 level_dict 获取对应的 level
-        community_report["community_nodes"] = node_list
-        community_report["raw_result"] = raw_result
-        community_report["community_text"] = community_text
+    community_report["community_id"] = community_id
+    community_report["level"] = level_dict.get(
+        community_id, None
+    )  # 使用 level_dict 获取对应的 level
+    community_report["community_nodes"] = node_list
+    community_report["raw_result"] = raw_result
+    community_report["community_text"] = community_text
 
-        if not community_report.get("title"):
-            community_report["title"] = f"CommunityID{community_id}"
-            
-        return community_report
-    finally:
-        # 将端口放回队列，供其他进程使用
-        port_queue.put(port)
+    if not community_report.get("title"):
+        community_report["title"] = f"CommunityID{community_id}"
+
+    return community_report
 
 
 def community_report_batch(
@@ -292,16 +227,9 @@ def community_report_batch(
     num_workers=32,
 ):
     results_community = []
-    ori_arg_base_url = args.api_base
 
     # 创建进程池
     with mp.Pool(processes=num_workers) as pool:
-        # 将可用的端口放入队列中
-        manager = mp.Manager()
-        port_queue = manager.Queue()
-        for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
-            for port in range(4):  # 端口范围 0, 1, 2, 3
-                port_queue.put(port)
 
         # 使用 partial 来将固定的参数传递到 worker 中
         process_func = partial(
@@ -310,7 +238,6 @@ def community_report_batch(
             final_relationships=final_relationships,
             args=args,
             level_dict=level_dict,
-            port_queue=port_queue,  # 传递端口队列
         )
 
         # 并行处理每个社区
@@ -318,8 +245,6 @@ def community_report_batch(
 
     # pool.close()  # 关闭进程池
     # pool.join()  # 等待所有进程完成
-
-    args.api_base = ori_arg_base_url
 
     community_df = pd.DataFrame(results_community)
     community_df = reprot_embedding_batch(community_df, args)

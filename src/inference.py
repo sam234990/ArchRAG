@@ -14,23 +14,26 @@ def hcarag(
     entity_df,
     community_df,
     level_summary_df,
+    relation_df,
     query_paras,
     args,
 ):
 
-    topk_entity, topk_community = hcarag_retrieval(
-        query_content,
-        hc_index,
-        entity_df,
-        community_df,
-        level_summary_df,
-        query_paras,
-        args,
+    topk_entity, topk_community, topk_related_r = hcarag_retrieval(
+        query_content=query_content,
+        hc_index=hc_index,
+        entity_df=entity_df,
+        community_df=community_df,
+        level_summary_df=level_summary_df,
+        relation_df=relation_df,
+        query_paras=query_paras,
+        args=args,
     )
 
     response_report = hcarag_inference(
         topk_entity,
         topk_community,
+        topk_related_r,
         query_content,
         args.max_retries,
         args,
@@ -45,6 +48,7 @@ def hcarag_retrieval(
     entity_df,
     community_df,
     level_summary_df,
+    relation_df,
     query_paras,
     args,
 ):
@@ -106,21 +110,19 @@ def hcarag_retrieval(
     topk_entity = entity_df[entity_df["index_id"].isin(final_predictions)]
     topk_community = community_df[community_df["index_id"].isin(final_predictions)]
 
-    return topk_entity, topk_community
+    topk_related_r = relation_df[relation_df["source_index_id"].isin(final_predictions)]
+
+    return topk_entity, topk_community, topk_related_r
 
 
 def hcarag_inference(
-    topk_entity,
-    topk_community,
-    query,
-    max_retries,
-    args,
-    query_paras,
+    topk_entity, topk_community, topk_related_r, query, max_retries, args, query_paras
 ):
     if query_paras["generate_strategy"] == "direct":
         response_report = hcarag_inference_direct(
             topk_entity,
             topk_community,
+            topk_related_r,
             query,
             max_retries,
             args,
@@ -129,8 +131,8 @@ def hcarag_inference(
         response_report = hcarag_inference_mr(
             topk_entity,
             topk_community,
+            topk_related_r,
             query,
-            max_retries,
             args,
         )
     return response_report
@@ -139,26 +141,16 @@ def hcarag_inference(
 def hcarag_inference_direct(
     topk_entity,
     topk_community,
+    topk_related_r,
     query,
     max_retries,
     args,
 ):
 
-    # 用于存储提取出的 entity_context 和 community_context
-    entity_context = []
-    community_context = []
-
-    # 提取 entity_df 中的 name 和 description 列构成 entity_context
-    for idx, row in topk_entity.iterrows():
-        entity_context.append(f"{idx}, {row['name']}, {row['description']}")
-
-    # 提取 community_df 中的 title 和 summary 列构成 community_context
-    for idx, row in topk_community.iterrows():
-        community_context.append(f"{idx}, {row['title']}, {row['summary']}")
-
     content = prep_infer_content(
-        entity_context=entity_context,
-        community_context=community_context,
+        entity_df=topk_entity,
+        relation_df=topk_related_r,
+        community_df=topk_community,
         query=query,
         max_tokens=args.max_tokens,
     )
@@ -190,13 +182,18 @@ def hcarag_inference_direct(
 def hcarag_inference_mr(
     topk_entity,
     topk_community,
+    topk_related_r,
     query,
-    max_retries,
     args,
 ):
-    raw_result = []
-    response = ""
-    response_report = {"response": response, "raw_result": raw_result}
+    map_res_df = map_inference(
+        entity_df=topk_entity,
+        community_df=topk_community,
+        relation_df=topk_related_r,
+        query=query,
+        args=args,
+    )
+    response_report = reduce_inference(map_res_df, query, args)
     return response_report
 
 
@@ -289,13 +286,16 @@ def load_index(args):
     level_summary_path = os.path.join(args.output_dir, "level_summary.csv")
     level_summary_df = pd.read_csv(level_summary_path)
 
-    return hc_index, entity_df, community_df, level_summary_df
+    relation_path = os.path.join(args.output_dir, "relationship_df_index.csv")
+    relation_df = pd.read_csv(relation_path)
+
+    return hc_index, entity_df, community_df, level_summary_df, relation_df
 
 
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
-    hc_index, entity_df, community_df, level_summary_df = load_index(args)
+    hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     test_question = "What is the usage and value of TLB in an Operating System?"
     # query_paras = {
     #     "strategy": "global",
@@ -304,11 +304,11 @@ if __name__ == "__main__":
     #     "inference_search_times": 2,
     # }
     query_paras = {
-        "strategy": "inference",
+        "strategy": "global",
         "k_each_level": 5,
         "k_final": 10,
         "inference_search_times": 2,
-        "generate_strategy": "direct",
+        "generate_strategy": "mr",
     }
     response = hcarag(
         test_question,
@@ -316,6 +316,7 @@ if __name__ == "__main__":
         entity_df,
         community_df,
         level_summary_df,
+        relation_df,
         query_paras,
         args,
     )

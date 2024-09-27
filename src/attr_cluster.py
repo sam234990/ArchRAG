@@ -310,6 +310,11 @@ def attr_cluster(
         else:
             c_n_mapping = compute_leiden(cos_graph, args.seed)
 
+        # check for finish
+        number_of_clusters = len(c_n_mapping)
+        if number_of_clusters < min_clusters:
+            break
+        
         # 如果不是第一层，需要调整 community_id
         if level > 1:
             updated_c_n_mapping = community_id_node_resize(
@@ -331,7 +336,7 @@ def attr_cluster(
             args.output_dir, f"tmp_community_df_{level}.csv"
         )
 
-        if os.path.exists(tmp_comunity_df_result):
+        if os.path.exists(tmp_comunity_df_result) and False:
             print(
                 f"File {tmp_comunity_df_result} already exists. Loading existing data."
             )
@@ -360,10 +365,6 @@ def attr_cluster(
         community_df = pd.concat([community_df, new_community_df], ignore_index=True)
         level += 1
 
-        # check for finish
-        number_of_clusters = len(c_n_mapping)
-        if number_of_clusters < min_clusters:
-            break
 
     return community_df
 

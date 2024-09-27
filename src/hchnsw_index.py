@@ -39,36 +39,24 @@ def entity_embedding(
         final_entities = final_entities.drop(columns=["embedding_context"])
     else:
         # Define a function that applies openai_embedding to each description
-        def compute_embedding(row, port_queue):
-            port = port_queue.get()  # 获取可用的端口
-            args.embedding_api_base = docker_list[port]
-            try:
-                # Replace community_text with the description in each row
-                if row["description"] is None:
-                    row_content = row["name"]
-                else:
-                    row_content = row["name"] + " " + row["description"]
-                return openai_embedding(
-                    row_content,  # Pass the description as input text
-                    args.embedding_api_key,
-                    args.embedding_api_base,
-                    args.embedding_model,
-                )
-            finally:
-                port_queue.put(port)
+        def compute_embedding(row):
+            # Replace community_text with the description in each row
+            if row["description"] is None:
+                row_content = row["name"]
+            else:
+                row_content = row["name"] + " " + row["description"]
+            return openai_embedding(
+                row_content,  # Pass the description as input text
+                args.embedding_api_key,
+                args.embedding_api_base,
+                args.embedding_model,
+            )
 
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
 
-            # 将可用的端口放入队列中
-            manager = mp.Manager()
-            port_queue = manager.Queue()
-            for _ in range(int(num_workers / 4)):  # 每个端口最多出现 8 次
-                for port in range(4):  # 端口范围 0, 1, 2, 3
-                    port_queue.put(port)
-
             embeddings = list(
                 executor.map(
-                    lambda row: compute_embedding(row, port_queue),
+                    lambda row: compute_embedding(row),
                     [row for _, row in final_entities.iterrows()],
                 )
             )

@@ -56,6 +56,16 @@ def make_hc_index(args):
 
     f_e_save_path = os.path.join(args.output_dir, "entity_df_index.csv")
     final_entity_df.to_csv(f_e_save_path, index=False)
+    print("finish save community_df and entity_df")
+    
+    entity_mapping = dict(zip(entities_df["human_readable_id"], entities_df["index_id"]))
+    final_relationships['source_index_id'] = final_relationships['head_id'].map(entity_mapping)
+    final_relationships['target_index_id'] = final_relationships['tail_id'].map(entity_mapping)
+    
+    f_r_save_path = os.path.join(args.output_dir, "relationship_df_index.csv")
+    final_relationships.to_csv(f_r_save_path, index=False)
+    print("finish save relationship_df")
+    
     print("finish compute HCa RAG index")
     print(
         f"Finished computing HCa RAG index in {time.time() - overall_start_time:.2f} seconds ()"
