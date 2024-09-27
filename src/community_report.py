@@ -1,5 +1,6 @@
 import json
 import multiprocessing as mp
+import os
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
@@ -223,13 +224,13 @@ def community_report_batch(
     final_entities,
     final_relationships,
     args,
+    error_save_path,
     level_dict: dict[str, int],
-    num_workers=32,
 ):
     results_community = []
 
     # 创建进程池
-    with mp.Pool(processes=num_workers) as pool:
+    with mp.Pool(processes=args.num_workers) as pool:
 
         # 使用 partial 来将固定的参数传递到 worker 中
         process_func = partial(
@@ -241,10 +242,15 @@ def community_report_batch(
         )
 
         # 并行处理每个社区
-        results_community = pool.starmap(process_func, communities.items())
-
-    # pool.close()  # 关闭进程池
-    # pool.join()  # 等待所有进程完成
+        try:
+            results_community = pool.starmap(process_func, communities.items())
+        except Exception as e:
+            logging.error(f"Error processing communities: {e}")
+            # 保存已成功的结果
+            if results_community:
+                community_df = pd.DataFrame(results_community)
+                community_df.to_csv(error_save_path, index=False)  # 保存到文件
+            raise  # 重新抛出异常以终止处理
 
     community_df = pd.DataFrame(results_community)
     community_df = reprot_embedding_batch(community_df, args)

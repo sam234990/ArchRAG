@@ -253,7 +253,12 @@ def trim_e_r_content(community_nodes, relationships):
 
 
 def prep_e_r_content(entity_df, relation_df, max_tokens=None):
-
+    if entity_df.empty:
+        return [COMMUNITY_CONTEXT]
+    
+    if relation_df.empty:
+        return [trim_e_r_content(entity_df, relation_df)]
+    
     relationships_sorted = relation_df.copy()
     relationships_sorted["degree_sum"] = (
         relationships_sorted["source_degree"] + relationships_sorted["target_degree"]
@@ -299,8 +304,11 @@ def prep_e_r_content(entity_df, relation_df, max_tokens=None):
     # If no valid context was generated, handle the case
     if not res_string_list:
         shortest_entity = entity_df.loc[entity_df["description"].str.len().idxmin()]
+        # 获取 shortest_entity 中的所有 human_readable_id
+        human_readable_ids = shortest_entity["human_readable_id"].tolist()
+
         related_relationships = relation_df[
-            relation_df["head_id"] == shortest_entity["human_readable_id"]
+            relation_df["head_id"].isin(human_readable_ids)
         ]
         new_string = trim_e_r_content(shortest_entity, related_relationships)
         if new_string:

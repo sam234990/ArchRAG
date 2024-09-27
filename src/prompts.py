@@ -390,13 +390,17 @@ where 15, 16, 1, 5, 7, 23, 2, 7, 34, 46, and 64 represent the id (not the index)
 
 Do not include information where the supporting evidence for it is not provided.
 
----Context data---
+---Target response length and format---
 
-{context_data}
+Multiple Paragraphs
 
 ---User Query---
 
 {user_query}
+
+---Context data---
+
+{context_data}
 
 ---Goal---
 
@@ -442,6 +446,13 @@ Style the response in json format, and ensure that all sections and details matc
 {user_query}
 
 Output:"""
+
+GENERATION_RESPONSE_FORMAT = {
+    "MP": "Multiple Paragraphs",
+    "SP": "Single Paragraph",
+    "SS": "Single Sentence",
+    "QA": "First directly Answer the Question. If there are multiple answers, separate them with a | symbol. Follow up with a single paragraph analysis.",
+}
 
 
 LEVEL_INFERENCE_PROMPT = """

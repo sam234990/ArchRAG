@@ -80,8 +80,8 @@ def read_graph_nx(
 
     print(f"Number of nodes: {graph.number_of_nodes()}")
     print(f"Number of edges: {graph.number_of_edges()}")
-    ent_embedding_sample = final_entities.loc[0, "description_embedding"]
-    print(f"embedding sample:{ent_embedding_sample.shape}")
+    ent_embedding_sample = final_entities.iloc[0]["description_embedding"]
+    print(f"embedding sample shape: {ent_embedding_sample.shape}")
 
     return graph, final_entities, relationships
 
@@ -380,6 +380,163 @@ def create_arg_parser():
         type=str,
         # required=True,
         default="llama3.1:8b",
+        help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
+    )
+
+    parser.add_argument(
+        "--max_tokens", type=int, default=4000, help="Maximum tokens to generate"
+    )
+
+    parser.add_argument(
+        "--max_community_tokens",
+        type=int,
+        default=4000,
+        help="Maximum community report tokens ",
+    )
+
+    parser.add_argument(
+        "--max_retries",
+        type=int,
+        default=5,
+        help="Maximum number of retries to make in case of failure",
+    )
+
+    parser.add_argument(
+        "--embedding_local",
+        type=bool,
+        default=False,
+        help="Whether to use local embeddings or not",
+    )
+
+    parser.add_argument(
+        "--embedding_model_local",
+        type=str,
+        default="nomic-embed-text-v1",
+        help="Model engine to be used for embeddings. Example values: 'sbert', 'contriever'",
+    )
+
+    parser.add_argument(
+        "--embedding_model",
+        type=str,
+        # required=True,
+        default="nomic-embed-text",
+        help="Model engine to be used for embeddings. Example values: 'text-embedding-ada-002', 'text-embedding-ada-003', 'text-embedding-ada-004'",
+    )
+    parser.add_argument(
+        "--embedding_api_key",
+        type=str,
+        # required=True,
+        default="ollama",
+        help="API key for accessing the service",
+    )
+    parser.add_argument(
+        "--embedding_api_base",
+        type=str,
+        # required=True,
+        default="http://localhost:5000/forward",
+        help="Base URL for the API service",
+    )
+
+    parser.add_argument(
+        "--entity_second_embedding",
+        type=lambda x: x.lower() == "True",
+        default=True,
+        help="Whether to use second entity embedding or not",
+    )
+
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=32,
+        help="Number of workers to use for parallel processing",
+    )
+
+    return parser
+
+
+def create_inference_arg_parser():
+    parser = argparse.ArgumentParser(
+        description="All the arguments needed for inference."
+    )
+    
+    # index
+    parser.add_argument(
+        "--base_path",
+        type=str,
+        # required=True,
+        default="/mnt/data/wangshu/hcarag/FB15k/KG",
+        help="Base path to the directory containing the graph data.",
+    )
+
+    parser.add_argument(
+        "--relationship_filename",
+        type=str,
+        default="relationships.csv",
+        help="Filename for the relationship data.",
+    )
+
+    parser.add_argument(
+        "--entity_filename",
+        type=str,
+        default="entity_df.csv",
+        help="Filename for the entity data.",
+    )
+
+
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        # required=True,
+        default="/mnt/data/wangshu/hcarag/FB15k/hc_index_8b",
+        help="Output dir path for index",
+    )
+    
+    # dataset info
+    parser.add_argument(
+        "--dataset_path",
+        type=str,
+        # required=True,
+        default="/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
+        help="dataset path for index",
+    )
+    parser.add_argument(
+        "--inference_output_dir",
+        type=str,
+        # required=True,
+        default="/mnt/data/wangshu/hcarag/FB15k/hc_index_8b/qa",
+        help="Output dir path for dataset output",
+    )
+
+    # attr clustering parameters
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0xDEADBEEF,
+        help="Seed for reproducibility in leiden clustering \
+            (default is hex 0xDEADBEEF, input can be any valid integer)",
+    )
+
+    # add LLM parameters
+    parser.add_argument(
+        "--api_key",
+        type=str,
+        # required=True,
+        help="API key for accessing the service",
+        default="ollama",
+    )
+    parser.add_argument(
+        "--api_base",
+        type=str,
+        # required=True,
+        help="Base URL for the API service",
+        default="http://localhost:5000/forward",
+    )
+
+    parser.add_argument(
+        "--engine",
+        type=str,
+        # required=True,
+        default="llama3.1:8b4k",
         help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
     )
 
