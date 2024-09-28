@@ -3,15 +3,16 @@ import multiprocessing as mp
 from functools import partial
 import logging
 
-from ..inference import *
-from ..utils import create_inference_arg_parser
-from .evaluate import *
+from src.inference import *
+from src.utils import create_inference_arg_parser
+from src.evaluate.evaluate import *
+
+DEBUG_FLAG = True
 
 
 def load_datasets(datasets_path) -> pd.DataFrame:
-    qa_df = pd.read_json(datasets_path)
+    qa_df = pd.read_json(datasets_path, orient="records", lines=True)
     return qa_df
-    pass
 
 
 def process_question(
@@ -47,8 +48,9 @@ def test_qa(query_paras, args):
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     qa_df = load_datasets(args.dataset_path)
 
+    number_works = args.num_workers if not DEBUG_FLAG else 1
     # 创建进程池
-    with mp.Pool(processes=args.num_workers) as pool:
+    with mp.Pool(processes=number_works) as pool:
         # 准备每个问题的输入参数
         process_func = partial(
             process_question,
@@ -94,7 +96,7 @@ if __name__ == "__main__":
     query_paras = {
         "strategy": "global",
         "k_each_level": 5,
-        "k_final": 10,
+        "k_final": 15,
         "inference_search_times": 2,
         "generate_strategy": "direct",
     }

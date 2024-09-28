@@ -5,7 +5,7 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from graspologic.partition import hierarchical_leiden, leiden
-from utils import *
+from src.utils import *
 from community_report import community_report_batch
 
 

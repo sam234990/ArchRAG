@@ -1,11 +1,11 @@
 import pandas as pd
 import os
 import faiss
-from utils import *
-from llm import llm_invoker
-from lm_emb import openai_embedding
-from hchnsw_index import read_index
-from client_reasoning import *
+from src.utils import *
+from src.llm import llm_invoker
+from src.lm_emb import openai_embedding
+from src.hchnsw_index import read_index
+from src.client_reasoning import *
 
 
 def hcarag(
@@ -110,8 +110,8 @@ def hcarag_retrieval(
     topk_entity = entity_df[entity_df["index_id"].isin(final_predictions)]
     topk_community = community_df[community_df["index_id"].isin(final_predictions)]
 
-    topk_related_r = relation_df[relation_df["source_index_id"].isin(final_predictions)]
-
+    # topk_related_r = relation_df[relation_df["source_index_id"].isin(final_predictions)]
+    topk_related_r = pd.DataFrame(columns=relation_df.columns)
     return topk_entity, topk_community, topk_related_r
 
 
@@ -125,6 +125,7 @@ def hcarag_inference(
             topk_related_r,
             query,
             max_retries,
+            query_paras,
             args,
         )
     else:
@@ -133,6 +134,7 @@ def hcarag_inference(
             topk_community,
             topk_related_r,
             query,
+            query_paras,
             args,
         )
     return response_report
@@ -144,6 +146,7 @@ def hcarag_inference_direct(
     topk_related_r,
     query,
     max_retries,
+    query_paras,
     args,
 ):
 
@@ -153,25 +156,17 @@ def hcarag_inference_direct(
         community_df=topk_community,
         query=query,
         max_tokens=args.max_tokens,
+        response_type=query_paras["response_type"],
     )
 
     retries = 0
-    success = False
     response = ""
 
-    while not success and retries < max_retries:
-        raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
-        try:
-            output = json.loads(raw_result)
-            if "response" in output:
-                response = output["response"]
-                break
-
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
+    while retries < max_retries:
+        raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=False)
+        if raw_result != "":
+            response = raw_result
+            break
         retries += 1
 
     response_report = {"response": response, "raw_result": raw_result}
@@ -184,6 +179,7 @@ def hcarag_inference_mr(
     topk_community,
     topk_related_r,
     query,
+    query_paras,
     args,
 ):
     map_res_df = map_inference(
@@ -293,10 +289,11 @@ def load_index(args):
 
 
 if __name__ == "__main__":
-    parser = create_arg_parser()
+    parser = create_inference_arg_parser()
     args = parser.parse_args()
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
-    test_question = "What is the usage and value of TLB in an Operating System?"
+    # test_question = "What is the usage and value of TLB in an Operating System?"
+    test_question = "what does jamaican people speak?"
     # query_paras = {
     #     "strategy": "global",
     #     "k_each_level": 5,
@@ -309,6 +306,8 @@ if __name__ == "__main__":
         "k_final": 10,
         "inference_search_times": 2,
         "generate_strategy": "mr",
+        # "generate_strategy": "direct",
+        "response_type": "QA",
     }
     response = hcarag(
         test_question,

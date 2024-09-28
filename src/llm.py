@@ -1,13 +1,15 @@
 import logging
 from openai import OpenAI
 import time
-from utils import create_arg_parser
+from src.utils import create_arg_parser
 
 
 log = logging.getLogger(__name__)
 
 
-def llm_invoker(input_text, args, temperature=0.7, max_tokens=1500, max_retries=5, json=False):
+def llm_invoker(
+    input_text, args, temperature=0.7, max_tokens=1500, max_retries=5, json=False
+):
 
     if "llama" in args.engine.lower():
         api_key = "ollama"

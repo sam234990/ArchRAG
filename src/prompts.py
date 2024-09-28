@@ -347,7 +347,6 @@ Return the output as a well-formed JSON-formatted string with the following form
 
 Output:"""
 
-
 GENERATION_PROMPT = """
 ---Role---
 
@@ -359,20 +358,31 @@ Generate a clear and concise response that meets the specified target length and
 
 If you don't know the answer, just say so. Do not make anything up.
 
-# Response Structure
+---Target response length and format---
 
-The response should include the following sections:
+{response_format}
 
-- RESPONSE: A well-structured answer that directly addresses the user's question by summarizing relevant information from the provided data context. In addition to the data context, use any relevant general knowledge you possess to further enrich the response. However, avoid including any unsupported claims or speculation. 
-- DATA REFERENCE: A list of 5-10 key relevant data points (in the format of record ids) that were referenced in the response. These data references provide support for the claims made in the **RESPONSE** section. 
+---User Query---
 
-Return output as a well-formed JSON-formatted string with the following format:
+{user_query}
 
-{{
-    "response": <response>,
-    "data_references": [<record ids>, <record ids>, ...]
-}}
+---Context data---
 
+{context_data}
+
+Output:"""
+
+
+GENERATION_PROMPT_ORI = """
+---Role---
+
+You are a helpful assistant responding to questions about data from the provided context.
+
+---Goal---
+
+Generate a clear and concise response that meets the specified target length and format. Base your response on the provided context data and support your claims with explicit references to that data. If additional general knowledge is relevant, incorporate it to enrich your answer, but avoid including any unsupported or speculative information. All responses must be grounded in the given data and real-world information.
+
+If you don't know the answer, just say so. Do not make anything up.
 
 # Grounding Rules
 
@@ -392,7 +402,7 @@ Do not include information where the supporting evidence for it is not provided.
 
 ---Target response length and format---
 
-Multiple Paragraphs
+{response_format}
 
 ---User Query---
 
@@ -402,56 +412,13 @@ Multiple Paragraphs
 
 {context_data}
 
----Goal---
-
-Generate a clear and concise response that meets the specified target length and format. Base your response on the provided context data and support your claims with explicit references to that data. If additional general knowledge is relevant, incorporate it to enrich your answer, but avoid including any unsupported or speculative information. All responses must be grounded in the given data and real-world information.
-
-If you don't know the answer, just say so. Do not make anything up.
-
-# Response Structure
-
-The response should include the following sections:
-
-- RESPONSE: A well-structured answer that directly addresses the user's question by summarizing relevant information from the provided data context. In addition to the data context, use any relevant general knowledge you possess to further enrich the response. However, avoid including any unsupported claims or speculation. 
-- DATA REFERENCE: A list of 5-10 key relevant data points (in the format of record ids) that were referenced in the response. These data references provide support for the claims made in the **RESPONSE** section. 
-
-Return output as a well-formed JSON-formatted string with the following format:
-
-{{
-    "response": <response>,
-    "data_references": [<record ids>, <record ids>, ...]
-}}
-
-
-# Grounding Rules
-
-Points supported by data should list their data references as follows:
-
-"This is an example sentence supported by multiple data references [Data: <dataset name> (record ids); <dataset name> (record ids)]."
-
-Do not list more than 5 record ids in a single reference. Instead, list the top 5 most relevant record ids and add "+more" to indicate that there are more.
-
-For example:
-
-"Person X is the owner of Company Y and subject to many allegations of wrongdoing [Data: Sources (15, 16), Reports (1), Entities (5, 7); Relationships (23); Claims (2, 7, 34, 46, 64, +more)]."
-
-where 15, 16, 1, 5, 7, 23, 2, 7, 34, 46, and 64 represent the id (not the index) of the relevant data record.
-
-Do not include information where the supporting evidence for it is not provided.
-
-Style the response in json format, and ensure that all sections and details match the required length and format.
-
----User Query---
-
-{user_query}
-
 Output:"""
 
 GENERATION_RESPONSE_FORMAT = {
     "MP": "Multiple Paragraphs",
     "SP": "Single Paragraph",
     "SS": "Single Sentence",
-    "QA": "First directly Answer the Question. If there are multiple answers, separate them with a | symbol. Follow up with a single paragraph analysis.",
+    "QA": "First directly Answer the Question. If multiple answers exist, separate them with a | symbol. Follow with a brief analysis consisting of a few sentences."
 }
 
 
@@ -667,8 +634,7 @@ Do not include information where the supporting evidence for it is not provided.
 
 ---Target response length and format---
 
-Multiple Paragraphs
-
+{response_format}
 
 ---User Question---
 

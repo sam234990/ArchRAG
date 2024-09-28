@@ -1,5 +1,5 @@
-from lm_emb import *
-from utils import *
+from src.lm_emb import *
+from src.utils import *
 from tqdm import tqdm
 import faiss
 import os

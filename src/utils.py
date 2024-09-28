@@ -447,7 +447,7 @@ def create_arg_parser():
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=32,
+        default=28,
         help="Number of workers to use for parallel processing",
     )
 
@@ -604,7 +604,7 @@ def create_inference_arg_parser():
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=32,
+        default=28,
         help="Number of workers to use for parallel processing",
     )
 

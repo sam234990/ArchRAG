@@ -4,11 +4,11 @@ import os
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
-from llm import llm_invoker
-from prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
-from utils import *
-from lm_emb import *
-from client_reasoning import prep_e_r_content
+from src.llm import llm_invoker
+from src.prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
+from src.utils import *
+from src.lm_emb import *
+from src.client_reasoning import prep_e_r_content
 
 
 def prep_community_report_content(

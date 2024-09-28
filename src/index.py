@@ -1,9 +1,9 @@
 import os
 import pandas as pd
-from utils import create_arg_parser, read_graph_nx, print_args
+from src.utils import create_arg_parser, read_graph_nx, print_args
 from attr_cluster import attr_cluster
-from hchnsw_index import entity_embedding, create_hchnsw_index
-from client_reasoning import level_summary
+from src.hchnsw_index import entity_embedding, create_hchnsw_index
+from src.client_reasoning import level_summary
 import time
 
 
@@ -57,15 +57,21 @@ def make_hc_index(args):
     f_e_save_path = os.path.join(args.output_dir, "entity_df_index.csv")
     final_entity_df.to_csv(f_e_save_path, index=False)
     print("finish save community_df and entity_df")
-    
-    entity_mapping = dict(zip(entities_df["human_readable_id"], entities_df["index_id"]))
-    final_relationships['source_index_id'] = final_relationships['head_id'].map(entity_mapping)
-    final_relationships['target_index_id'] = final_relationships['tail_id'].map(entity_mapping)
-    
+
+    entity_mapping = dict(
+        zip(entities_df["human_readable_id"], entities_df["index_id"])
+    )
+    final_relationships["source_index_id"] = final_relationships["head_id"].map(
+        entity_mapping
+    )
+    final_relationships["target_index_id"] = final_relationships["tail_id"].map(
+        entity_mapping
+    )
+
     f_r_save_path = os.path.join(args.output_dir, "relationship_df_index.csv")
     final_relationships.to_csv(f_r_save_path, index=False)
     print("finish save relationship_df")
-    
+
     print("finish compute HCa RAG index")
     print(
         f"Finished computing HCa RAG index in {time.time() - overall_start_time:.2f} seconds ()"

@@ -7,9 +7,9 @@ import multiprocessing as mp
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple, Dict, Any
-from llm import llm_invoker
-from utils import *
-from prompts import *
+from src.llm import llm_invoker
+from src.utils import *
+from src.prompts import *
 
 
 def problem_reasoning(
@@ -255,10 +255,10 @@ def trim_e_r_content(community_nodes, relationships):
 def prep_e_r_content(entity_df, relation_df, max_tokens=None):
     if entity_df.empty:
         return [COMMUNITY_CONTEXT]
-    
+
     if relation_df.empty:
         return [trim_e_r_content(entity_df, relation_df)]
-    
+
     relationships_sorted = relation_df.copy()
     relationships_sorted["degree_sum"] = (
         relationships_sorted["source_degree"] + relationships_sorted["target_degree"]
@@ -318,19 +318,26 @@ def prep_e_r_content(entity_df, relation_df, max_tokens=None):
 
 
 def prep_infer_content(
-    entity_df, relation_df, community_df, query, max_tokens=None
+    entity_df, relation_df, community_df, query, max_tokens=None, response_type="QA"
 ) -> str:
 
     res_content = ""
     if not entity_df.empty:
         e_r_content = prep_e_r_content(entity_df, relation_df, max_tokens=max_tokens)
-        res_content += e_r_content
+        res_content += e_r_content[0]
 
     if not community_df.empty:
         c_content = prep_community_content(community_df, max_tokens)
-        res_content += "\n\n".join(c_content[0])
+        res_content += "\n\n"
+        res_content += c_content[0]
 
-    res_content = GENERATION_PROMPT.format(context_data=res_content, user_query=query)
+    response_type_content = GENERATION_RESPONSE_FORMAT[response_type]
+
+    res_content = GENERATION_PROMPT.format(
+        context_data=res_content,
+        user_query=query,
+        response_format=response_type_content,
+    )
     return res_content.strip()
 
 
@@ -498,10 +505,11 @@ def prep_reduce_content(map_response_df: pd.DataFrame, max_tokens=None) -> str:
     return text_data
 
 
-def reduce_inference(map_res_df, query, args):
+def reduce_inference(map_res_df, query, args, response_type="QA"):
     reduce_context = prep_reduce_content(map_res_df, max_tokens=args.max_tokens)
+    response_type_content = GENERATION_RESPONSE_FORMAT[response_type]
     reduce_prompt = GLOBAL_REDUCE_SYSTEM_PROMPT.format(
-        report_data=reduce_context, user_query=query
+        report_data=reduce_context, user_query=query, response_format=response_type_content
     )
     if reduce_context == "":
         reduce_prompt += GENERAL_KNOWLEDGE_INSTRUCTION
@@ -511,7 +519,7 @@ def reduce_inference(map_res_df, query, args):
 
     while retries < args.max_retries:
         raw_result = llm_invoker(
-            reduce_prompt, args, max_tokens=args.max_tokens, json=True
+            reduce_prompt, args, max_tokens=args.max_tokens, json=False
         )
         if raw_result != "":
             response = raw_result
