@@ -451,6 +451,14 @@ def create_arg_parser():
         help="Number of workers to use for parallel processing",
     )
 
+    # log
+    parser.add_argument(
+        "--print_log",
+        type=lambda x: x.lower() == "True",
+        default=True,
+        help="Whether to print log or not",
+    )
+
     return parser
 
 
@@ -458,7 +466,7 @@ def create_inference_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for inference."
     )
-    
+
     # index
     parser.add_argument(
         "--base_path",
@@ -482,7 +490,6 @@ def create_inference_arg_parser():
         help="Filename for the entity data.",
     )
 
-
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -490,7 +497,7 @@ def create_inference_arg_parser():
         default="/mnt/data/wangshu/hcarag/FB15k/hc_index_8b",
         help="Output dir path for index",
     )
-    
+
     # dataset info
     parser.add_argument(
         "--dataset_path",
@@ -606,6 +613,14 @@ def create_inference_arg_parser():
         type=int,
         default=28,
         help="Number of workers to use for parallel processing",
+    )
+
+    # log
+    parser.add_argument(
+        "--print_log",
+        type=lambda x: x.lower() == "True",
+        default=True,
+        help="Whether to print log or not",
     )
 
     return parser

@@ -160,16 +160,17 @@ def hcarag_inference_direct(
     )
 
     retries = 0
-    response = ""
+    direct_answer = ""
 
     while retries < max_retries:
         raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=False)
-        if raw_result != "":
-            response = raw_result
+
+        success, direct_answer = qa_response_extract(raw_result)
+        if success:
             break
         retries += 1
 
-    response_report = {"response": response, "raw_result": raw_result}
+    response_report = {"pred": direct_answer, "raw_result": raw_result}
 
     return response_report
 
@@ -222,8 +223,7 @@ def load_strategy(
             args=args,
         )
 
-        times = query_paras["inference_search_times"]
-        all_k = times * k_final
+        all_k = query_paras["all_k_inference"]
 
         k_per_level = calculate_k_per_level(level_weight, all_k)
 
@@ -298,13 +298,13 @@ if __name__ == "__main__":
     #     "strategy": "global",
     #     "k_each_level": 5,
     #     "k_final": 10,
-    #     "inference_search_times": 2,
+    #     "all_k_inference": 2,
     # }
     query_paras = {
         "strategy": "global",
         "k_each_level": 5,
         "k_final": 10,
-        "inference_search_times": 2,
+        "all_k_inference": 15,
         "generate_strategy": "mr",
         # "generate_strategy": "direct",
         "response_type": "QA",
@@ -319,4 +319,5 @@ if __name__ == "__main__":
         query_paras,
         args,
     )
-    print(response["response"])
+    print(response["raw_result"])
+    print(response["pred"])

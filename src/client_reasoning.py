@@ -515,21 +515,37 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
         reduce_prompt += GENERAL_KNOWLEDGE_INSTRUCTION
 
     retries = 0
-    response = ""
+    direct_answer = ""
 
     while retries < args.max_retries:
         raw_result = llm_invoker(
             reduce_prompt, args, max_tokens=args.max_tokens, json=False
         )
-        if raw_result != "":
-            response = raw_result
+        success, direct_answer = qa_response_extract(raw_result)
+        if success:
             break
         retries += 1
 
-    response_report = {"response": response, "raw_result": raw_result}
+    response_report = {"pred": direct_answer, "raw_result": raw_result}
 
     return response_report
 
+
+def qa_response_extract(response_content:str):
+    # 定义简化的正则表达式模式
+    pattern = r"Direct Answer\s*(.+?)\s*Brief Analysis"
+    # 使用正则表达式匹配
+    match = re.search(pattern, response_content, re.DOTALL)
+    
+    if match:
+        # 提取并返回Direct Answer部分
+        direct_answer = match.group(1).strip()
+        # 替换除|以外的符号为空格
+        direct_answer = re.sub(r'[^|\w\s]', ' ', direct_answer)
+        direct_answer = re.sub(r'\s+', ' ', direct_answer).strip()  # 去除多余空格
+        return True, direct_answer
+    else:
+        return False, ""
 
 if __name__ == "__main__":
     parser = create_arg_parser()

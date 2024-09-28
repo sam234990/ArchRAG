@@ -356,8 +356,7 @@ You are a helpful assistant responding to questions about data from the provided
 
 Generate a clear and concise response that meets the specified target length and format. Base your response on the provided context data and support your claims with explicit references to that data. If additional general knowledge is relevant, incorporate it to enrich your answer, but avoid including any unsupported or speculative information. All responses must be grounded in the given data and real-world information.
 
-If you don't know the answer, just say so. Do not make anything up.
-
+Please note that the provided information may contain inaccuracies or be unrelated. If the provided information does not address the question, please respond using what you know. If you don't know the answer, just say so. Do not make anything up.
 ---Target response length and format---
 
 {response_format}
@@ -418,7 +417,15 @@ GENERATION_RESPONSE_FORMAT = {
     "MP": "Multiple Paragraphs",
     "SP": "Single Paragraph",
     "SS": "Single Sentence",
-    "QA": "First directly Answer the Question. If multiple answers exist, separate them with a | symbol. Follow with a brief analysis consisting of a few sentences."
+    "QA": """Please respond using the format outlined below, ensuring each section begins with the specified phrases and symbols.
+
+---Direct Answer---: Provide only the answer to the question, without any additional commentary. If there are multiple answers, separate them strictly using the | symbol.
+---Brief Analysis---: Offer a concise analysis in a few sentences, highlighting key points or insights related to your answer.
+
+Example format:
+---Direct Answer---: <answer_1> | <answer_2> | <answer_3>
+---Brief Analysis---: <analysis>
+"""
 }
 
 
@@ -611,7 +618,7 @@ Generate a response of the target length and format that responds to the user's 
 
 Note that the analysts' reports provided below are ranked in the **descending order of importance**.
 
-If you don't know the answer or if the provided reports do not contain sufficient information to provide an answer, just say so. Do not make anything up.
+Please note that the provided information may contain inaccuracies or be unrelated. If the provided information does not address the question, please respond using what you know. If you don't know the answer or if the provided reports do not contain sufficient information to provide an answer, just say so. Do not make anything up.
 
 The final response should remove all irrelevant information from the analysts' reports and merge the cleaned information into a comprehensive answer that provides explanations of all the key points and implications appropriate for the response length and format.
 
