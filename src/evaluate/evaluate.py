@@ -77,7 +77,7 @@ def eval_hit(prediction, answer):
 
 def get_accuracy_webqsp_qa(path):
     # df = pd.read_json(path, lines=True)
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, na_filter=False)
 
     # Load results
     acc_list = []

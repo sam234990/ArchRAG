@@ -543,9 +543,11 @@ def qa_response_extract(response_content:str):
         # 替换除|以外的符号为空格
         direct_answer = re.sub(r'[^|\w\s]', ' ', direct_answer)
         direct_answer = re.sub(r'\s+', ' ', direct_answer).strip()  # 去除多余空格
-        return True, direct_answer
-    else:
-        return False, ""
+        # 检查direct_answer是否为空
+        if direct_answer:
+            return True, direct_answer
+    
+    return False, ""
 
 if __name__ == "__main__":
     parser = create_arg_parser()

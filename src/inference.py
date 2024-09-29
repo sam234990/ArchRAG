@@ -137,6 +137,10 @@ def hcarag_inference(
             query_paras,
             args,
         )
+        
+    if response_report["pred"] == "":
+        response_report["pred"] = "No answer found."
+    
     return response_report
 
 

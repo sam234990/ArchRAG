@@ -101,7 +101,7 @@ def test_qa(query_paras, args):
         else:
             print(f"Index {idx} is out of range for qa_df.")
 
-    qa_df['pred'] = qa_df['pred'].fillna("No Answer")
+    qa_df['pred'] = qa_df['pred'].fillna("No Answer", inplace=False)
     qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 
     qa_df.to_csv(save_file_qa, index=False)
