@@ -1,5 +1,9 @@
 import tiktoken
 import argparse
+from src.lm_emb import *
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+import multiprocessing as mp
 
 # import random
 import faiss
@@ -271,6 +275,116 @@ def try_parse_json_object(input: str) -> tuple[str, dict]:
             return input, result
     else:
         return input, result
+
+
+def entity_embedding(
+    entity_df: pd.DataFrame, args, embed_colname="embedding", num_workers=28
+):
+
+    if embed_colname in entity_df.columns:
+        print(f"column name :{embed_colname} existing")
+        return entity_df
+
+    print(f"local is {args.embedding_local}")
+
+    if args.embedding_local:
+        print("Loading local embedding model")
+        model, tokenizer, device = load_sbert(args.embedding_model_local)
+        entity_df["embedding_context"] = entity_df.apply(
+            lambda x: (
+                x["name"] + " " + x["description"]
+                if x["description"] is not None
+                else x["name"]
+            ),
+            axis=1,
+        )
+        texts = entity_df["embedding_context"].tolist()
+        entity_df[embed_colname] = text_to_embedding_batch(
+            model, tokenizer, device, texts
+        )
+        entity_df = entity_df.drop(columns=["embedding_context"])
+    else:
+        # Define a function that applies openai_embedding to each description
+        def compute_embedding(row):
+            # Replace community_text with the description in each row
+            if row["description"] is None:
+                row_content = row["name"]
+            else:
+                row_content = row["name"] + " " + row["description"]
+            return openai_embedding(
+                row_content,  # Pass the description as input text
+                args.embedding_api_key,
+                args.embedding_api_base,
+                args.embedding_model,
+            )
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            rows = [row for _, row in entity_df.iterrows()]
+            # 使用 tqdm 包装可迭代对象，以显示进度条
+            embeddings = list(
+                tqdm(
+                    executor.map(compute_embedding, rows),
+                    total=len(rows),
+                    desc="Computing embeddings",
+                )
+            )
+
+        entity_df[embed_colname] = embeddings
+    return entity_df
+
+
+def compute_embedding(input_a_d):
+    args, description = input_a_d
+    return openai_embedding(
+        description,  # Pass the description as input text
+        args.embedding_api_key,
+        args.embedding_api_base,
+        args.embedding_model,
+    )
+
+
+def relation_embedding(
+    relation_df: pd.DataFrame,
+    args,
+    e_colname="description",
+    embed_colname="embedding",
+    num_workers=32,
+):
+    if embed_colname in relation_df.columns:
+        print(f"column name :{embed_colname} existing")
+        return relation_df
+
+    relation_df[e_colname] = relation_df[e_colname].fillna("N")
+    # 提取唯一描述
+    unique_descriptions = relation_df[e_colname].unique()
+
+    print(f"local is {args.embedding_local}")
+    print(f"the number of unique {e_colname} is {len(unique_descriptions)}")
+    if args.embedding_local:
+        print("Loading local embedding model")
+        model, tokenizer, device = load_sbert(args.embedding_model_local)
+
+        embeddings = text_to_embedding_batch(
+            model, tokenizer, device, unique_descriptions
+        )
+    else:
+        args_list = [(args, desc) for desc in unique_descriptions]
+        with mp.Pool(processes=num_workers) as pool:
+            embeddings = list(
+                tqdm(
+                    pool.imap(compute_embedding, args_list),
+                    total=len(unique_descriptions),
+                    desc="Computing embeddings",
+                    leave=True,  # 保持进度条显示在输出中
+                )
+            )
+    # 创建一个映射从描述到嵌入
+    embedding_mapping = dict(zip(unique_descriptions, embeddings))
+
+    # 将嵌入合并回原 DataFrame
+    relation_df[embed_colname] = relation_df[e_colname].map(embedding_mapping)
+
+    return relation_df
 
 
 def create_arg_parser():

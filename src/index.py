@@ -1,8 +1,8 @@
 import os
 import pandas as pd
-from src.utils import create_arg_parser, read_graph_nx, print_args
+from src.utils import *
 from attr_cluster import attr_cluster
-from src.hchnsw_index import entity_embedding, create_hchnsw_index
+from src.hchnsw_index import create_hchnsw_index
 from src.client_reasoning import level_summary
 import time
 
@@ -36,8 +36,10 @@ def make_hc_index(args):
 
     if args.entity_second_embedding:
         entities_df: pd.DataFrame = entity_embedding(entities_df, args=args)
+        # final_relationships = relation_embedding(final_relationships, args=args)
     else:
         entities_df["embedding"] = entities_df["description_embedding"]
+        # final_relationships["embedding"] = final_relationships["relation_embedding"]
 
     final_community_df, final_entity_df = create_hchnsw_index(
         community_df=community_df, entity_df=entities_df, save_path=args.output_dir
