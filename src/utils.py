@@ -1,7 +1,7 @@
 import tiktoken
 import argparse
 from src.lm_emb import *
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import multiprocessing as mp
 
@@ -58,6 +58,8 @@ def read_graph_nx(
         relationships["head_id"] = relationships["source"].map(name_to_id)
         relationships["tail_id"] = relationships["target"].map(name_to_id)
 
+    print(f"Number of entities: {final_entities.shape[0]}")
+    
     # Create a NetworkX graph
     graph = nx.Graph()
     for _, row in final_entities.iterrows():
@@ -123,7 +125,45 @@ def build_faiss_hnsw_index(graph, embedding_dim):
     return hnsw_index, node_list
 
 
-def compute_distance(graph, x_percentile=0.7, search_k=1.5, m_du_sacle=1):
+def compute_new_edges_batch(
+    node_batch, hnsw_index, node_list, graph, wx, m_du, search_nodes
+):
+    batch_new_edges = []
+    for idx, u in enumerate(node_batch):
+        u_emb = np.array(graph.nodes[u]["embedding"], dtype=np.float32)
+        u_emb = np.expand_dims(u_emb, axis=0)  # Convert (dim,) to (1, dim)
+
+        # Use Faiss HNSW to find the k+1 nearest neighbors (including itself)
+        D, I = hnsw_index.search(u_emb, search_nodes)
+        neighbor_indices = I[0]
+
+        # Filter out the node itself from neighbors
+        neighbor_indices = [
+            node_idx for node_idx in neighbor_indices if node_idx != node_list.index(u)
+        ]
+
+        new_edges = []
+        for v_idx in neighbor_indices:
+            v = node_list[v_idx]
+            if not graph.has_edge(u, v):
+                v_emb = graph.nodes[v]["embedding"]
+                cos_sim = embedding_similarity(u_emb.flatten(), v_emb)
+
+                if cos_sim > wx:
+                    new_edges.append((u, v, cos_sim))
+        # Sort the new edges by similarity and limit to m_du edges
+        new_edges = sorted(new_edges, key=lambda x: x[2], reverse=True)
+        max_num = min(len(new_edges), int(m_du))
+        batch_new_edges.extend(new_edges[:max_num])
+        if idx % (len(node_batch) / 3) == 0:
+            print(f"Processed {idx} nodes in the batch")
+
+    return batch_new_edges  # Return only the top m_du edges
+
+
+def compute_distance(
+    graph, x_percentile=0.7, search_k=1.5, m_du_sacle=1, num_workers=32
+):
     """
     Compute the distance between all nodes in the graph and enhance the graph by adding more edges.
 
@@ -172,37 +212,65 @@ def compute_distance(graph, x_percentile=0.7, search_k=1.5, m_du_sacle=1):
     )  # Get embedding dimension
     hnsw_index, node_list = build_faiss_hnsw_index(graph, embedding_dim)
 
-    for u in graph.nodes():
-        u_emb = np.array(graph.nodes[u]["embedding"], dtype=np.float32)
+    if graph.number_of_nodes() > 100:
+        print("Using parallel processing to compute new edges")
+        all_new_edges = []
+        with mp.Pool(processes=num_workers) as pool:
+            print(
+                f"Using multiprocessing Pool to compute new edges with {num_workers} workers"
+            )
+            # Split nodes into batches
+            node_batches = np.array_split(list(graph.nodes()), num_workers)
+            results = list(
+                pool.starmap(
+                    compute_new_edges_batch,
+                    [
+                        (batch, hnsw_index, node_list, graph, wx, m_du, search_nodes)
+                        for batch in node_batches
+                    ],
+                )
+            )
 
-        # Ensure u_emb is (1, dim) shape for Faiss
-        u_emb = np.expand_dims(u_emb, axis=0)  # Convert (dim,) to (1, dim)
+            for new_edges in results:
+                all_new_edges.extend(new_edges)
 
-        # Use Faiss HNSW to find the k+1 nearest neighbors (including itself)
-        D, I = hnsw_index.search(u_emb, search_nodes)
-        neighbor_indices = I[0]
-
-        # Filter out the node itself from neighbors
-        neighbor_indices = [
-            node_idx for node_idx in neighbor_indices if node_idx != node_list.index(u)
-        ]
-
-        # Calculate cosine similarity and add edges if similarity > wx
-        new_edges = []
-        for v_idx in neighbor_indices:
-            v = node_list[v_idx]
-            if not res_graph.has_edge(u, v):
-                v_emb = graph.nodes[v]["embedding"]
-                cos_sim = embedding_similarity(u_emb.flatten(), v_emb)
-
-                if cos_sim > wx:
-                    new_edges.append((u, v, cos_sim))
-
-        # Sort the new edges by similarity and add up to m_du edges
-        new_edges = sorted(new_edges, key=lambda x: x[2], reverse=True)
-        for i in range(min(len(new_edges), int(m_du))):
-            u, v, weight = new_edges[i]
+        # Add new edges to the res_graph after collecting all of them
+        for u, v, weight in all_new_edges:
             res_graph.add_edge(u, v, weight=weight)
+    else:
+        for u in graph.nodes():
+            u_emb = np.array(graph.nodes[u]["embedding"], dtype=np.float32)
+
+            # Ensure u_emb is (1, dim) shape for Faiss
+            u_emb = np.expand_dims(u_emb, axis=0)  # Convert (dim,) to (1, dim)
+
+            # Use Faiss HNSW to find the k+1 nearest neighbors (including itself)
+            D, I = hnsw_index.search(u_emb, search_nodes)
+            neighbor_indices = I[0]
+
+            # Filter out the node itself from neighbors
+            neighbor_indices = [
+                node_idx
+                for node_idx in neighbor_indices
+                if node_idx != node_list.index(u)
+            ]
+
+            # Calculate cosine similarity and add edges if similarity > wx
+            new_edges = []
+            for v_idx in neighbor_indices:
+                v = node_list[v_idx]
+                if not res_graph.has_edge(u, v):
+                    v_emb = graph.nodes[v]["embedding"]
+                    cos_sim = embedding_similarity(u_emb.flatten(), v_emb)
+
+                    if cos_sim > wx:
+                        new_edges.append((u, v, cos_sim))
+
+            # Sort the new edges by similarity and add up to m_du edges
+            new_edges = sorted(new_edges, key=lambda x: x[2], reverse=True)
+            for i in range(min(len(new_edges), int(m_du))):
+                u, v, weight = new_edges[i]
+                res_graph.add_edge(u, v, weight=weight)
 
     # Print the final graph statistics
     final_edges_count = res_graph.number_of_edges()
