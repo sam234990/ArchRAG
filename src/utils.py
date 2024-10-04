@@ -59,7 +59,7 @@ def read_graph_nx(
         relationships["tail_id"] = relationships["target"].map(name_to_id)
 
     print(f"Number of entities: {final_entities.shape[0]}")
-    
+
     # Create a NetworkX graph
     graph = nx.Graph()
     for _, row in final_entities.iterrows():
@@ -561,7 +561,7 @@ def create_arg_parser():
         "--engine",
         type=str,
         # required=True,
-        default="llama3.1:8b",
+        default="llama3.1:8b4k",
         help="Model engine to be used. Example values: 'gpt-3.5-turbo', 'gpt-4', 'davinci', 'curie', 'llama3'",
     )
 
@@ -621,7 +621,7 @@ def create_arg_parser():
 
     parser.add_argument(
         "--entity_second_embedding",
-        type=lambda x: x.lower() == "True",
+        type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to use second entity embedding or not",
     )
@@ -629,16 +629,23 @@ def create_arg_parser():
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=28,
+        default=24,
         help="Number of workers to use for parallel processing",
     )
 
     # log
     parser.add_argument(
         "--print_log",
-        type=lambda x: x.lower() == "True",
+        type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to print log or not",
+    )
+
+    parser.add_argument(
+        "--debug_flag",
+        type=lambda x: x.lower() == "true",
+        default=False,
+        help="Whether to use debug flag or not",
     )
 
     return parser
@@ -785,34 +792,89 @@ def create_inference_arg_parser():
 
     parser.add_argument(
         "--entity_second_embedding",
-        type=lambda x: x.lower() == "True",
+        type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to use second entity embedding or not",
     )
 
+    # parallel processing
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=28,
+        default=24,
         help="Number of workers to use for parallel processing",
+    )
+
+    # query and inference parameters
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="global",
+        help="Strategy for inference",
+    )
+
+    parser.add_argument(
+        "--k_each_level",
+        type=int,
+        default=5,
+        help="Number of k for each level",
+    )
+
+    parser.add_argument(
+        "--k_final",
+        type=int,
+        default=15,
+        help="Number of k for final",
+    )
+
+    parser.add_argument(
+        "--all_k_inference",
+        type=int,
+        default=15,
+        help="Number of k for all inference",
+    )
+
+    parser.add_argument(
+        "--generate_strategy",
+        type=str,
+        default="direct",
+        help="Strategy for generation",
+    )
+
+    parser.add_argument(
+        "--response_type",
+        type=str,
+        default="QA",
+        help="Type of response for generate answer",
     )
 
     # log
     parser.add_argument(
         "--print_log",
-        type=lambda x: x.lower() == "True",
+        type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to print log or not",
+    )
+
+    parser.add_argument(
+        "--debug_flag",
+        type=lambda x: x.lower() == "true",
+        default=False,
+        help="Whether to use debug flag or not",
     )
 
     return parser
 
 
-def print_args(args):
-    print("Parsed Arguments:")
-    for arg, value in vars(args).items():
-        print(f"{arg}: {value}")
-
+def print_args(args, print_str="Parsed Arguments:"):
+    print(print_str)
+    if type(args) == argparse.Namespace:
+        for arg, value in vars(args).items():
+            print(f"{arg}: {value}")
+    elif type(args) == dict:
+        for arg, value in args.items():
+            print(f"{arg}: {value}")
+    
 
 if __name__ == "__main__":
     base_path = "/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts"

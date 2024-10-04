@@ -8,21 +8,35 @@ from src.llm import llm_invoker
 from src.prompts import COMMUNITY_REPORT_PROMPT, COMMUNITY_CONTEXT
 from src.utils import *
 from src.lm_emb import *
-from src.client_reasoning import prep_e_r_content
+from src.client_reasoning import prep_e_r_content, prep_community_content
 
 
 def prep_community_report_content(
     level,
     community_entities,
     relationships,
-    sub_communities_summary=None,
+    sub_communities_df=None,
     max_tokens=None,
 ):
-    new_string = prep_e_r_content(
-        community_entities, relationships, max_tokens=max_tokens
-    )
-
-    return new_string[0]
+    if (level > 0) and (sub_communities_df is not None):
+        community_str_list = prep_community_content(
+            sub_communities_df, max_tokens=max_tokens
+        )
+        community_string = community_str_list[0]
+        if len(community_str_list) > 1:
+            return community_string
+        else:
+            remain_token = max_tokens - num_tokens(community_string)
+            remain_e_r_list = prep_e_r_content(
+                community_entities, relationships, max_tokens=remain_token
+            )
+            return community_string + remain_e_r_list[0]
+    else:
+        new_string = prep_e_r_content(
+            community_entities, relationships, max_tokens=max_tokens
+        )
+        e_r_string = new_string[0]
+        return e_r_string
 
 
 def extract_community_report(result, community_id):
@@ -181,8 +195,10 @@ def reprot_embedding_batch(community_df, args, num_workers=32):
 def community_report_worker(
     community_id,
     node_list,
+    c_c_mapping,
     final_entities,
     final_relationships,
+    exist_community_df,
     args,
     level_dict,
 ):
@@ -197,8 +213,22 @@ def community_report_worker(
         final_relationships["head_id"].isin(node_list)
     ]
 
+    if c_c_mapping is not None:
+        sub_communities = c_c_mapping.get(str(community_id), [])
+        sub_communities_df = exist_community_df[
+            exist_community_df["community_id"].isin(sub_communities)
+        ]
+    else:
+        sub_communities_df = pd.DataFrame()
+
+    community_level = level_dict.get(community_id, 0)
+
     community_text = prep_community_report_content(
-        0, community_entities, community_relationships, max_tokens=args.max_tokens
+        community_level,
+        community_entities,
+        community_relationships,
+        sub_communities_df=sub_communities_df,
+        max_tokens=args.max_tokens,
     )
 
     raw_result, community_report = generate_community_report(
@@ -221,8 +251,10 @@ def community_report_worker(
 
 def community_report_batch(
     communities: dict[str, list[str]],
+    c_c_mapping: dict[str, list[str]],
     final_entities,
     final_relationships,
+    exist_community_df,
     args,
     error_save_path,
     level_dict: dict[str, int],
@@ -235,8 +267,10 @@ def community_report_batch(
         # 使用 partial 来将固定的参数传递到 worker 中
         process_func = partial(
             community_report_worker,
+            c_c_mapping=c_c_mapping,
             final_entities=final_entities,
             final_relationships=final_relationships,
+            exist_community_df=exist_community_df,
             args=args,
             level_dict=level_dict,
         )

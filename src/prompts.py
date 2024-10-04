@@ -356,7 +356,8 @@ You are a helpful assistant responding to questions about data from the provided
 
 Generate a clear and concise response that meets the specified target length and format. Base your response on the provided context data and support your claims with explicit references to that data. If additional general knowledge is relevant, incorporate it to enrich your answer, but avoid including any unsupported or speculative information. All responses must be grounded in the given data and real-world information.
 
-Please note that the provided information may contain inaccuracies or be unrelated. If the provided information does not address the question, please respond using what you know. If you don't know the answer, just say so. Do not make anything up.
+Please note that the provided information may contain inaccuracies or be unrelated. If the provided information does not address the question, please respond using what you know. 
+
 ---Target response length and format---
 
 {response_format}
@@ -381,7 +382,7 @@ You are a helpful assistant responding to questions about data from the provided
 
 Generate a clear and concise response that meets the specified target length and format. Base your response on the provided context data and support your claims with explicit references to that data. If additional general knowledge is relevant, incorporate it to enrich your answer, but avoid including any unsupported or speculative information. All responses must be grounded in the given data and real-world information.
 
-If you don't know the answer, just say so. Do not make anything up.
+Please note that the provided information may contain inaccuracies or be unrelated. If the provided information does not address the question, please respond using what you know. If you don't know the answer, just say so. Do not make anything up.
 
 # Grounding Rules
 

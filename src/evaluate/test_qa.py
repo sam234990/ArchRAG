@@ -7,8 +7,6 @@ from src.inference import *
 from src.utils import create_inference_arg_parser
 from src.evaluate.evaluate import *
 
-DEBUG_FLAG = True
-
 
 def load_datasets(datasets_path) -> pd.DataFrame:
     qa_df = pd.read_json(datasets_path, orient="records", lines=True)
@@ -51,11 +49,12 @@ def process_question(
 def test_qa(query_paras, args):
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     qa_df = load_datasets(args.dataset_path)
-    
+
     # 重置索引，确保连续性
     qa_df.reset_index(drop=True, inplace=True)
-    
-    qa_df = qa_df.iloc[:20] if DEBUG_FLAG else qa_df
+
+    DEBUG_FLAG = args.debug_flag
+    qa_df = qa_df.iloc[:10] if DEBUG_FLAG else qa_df
 
     save_file_str = (
         f"{query_paras['strategy']}_"
@@ -67,8 +66,13 @@ def test_qa(query_paras, args):
     )
     save_file_str += ".json"
     save_file_qa = os.path.join(args.inference_output_dir, save_file_str)
+    print_args(query_paras, "Query Parameters:")
+    print(f"Save file: {save_file_qa}")
 
-    number_works = args.num_workers if not DEBUG_FLAG else 20
+    number_works = args.num_workers if not DEBUG_FLAG else 2
+    print(f"Number of workers: {number_works}")
+    print(f"Number of questions: {len(qa_df)}")
+
     # 创建进程池
     with mp.Pool(processes=number_works) as pool:
         # 准备每个问题的输入参数
@@ -84,10 +88,12 @@ def test_qa(query_paras, args):
         )
 
         # 使用 enumerate 处理每个问题，确保索引正确
-        results = pool.starmap(process_func, [(idx, row) for idx, row in qa_df.iterrows()])
+        results = pool.starmap(
+            process_func, [(idx, row) for idx, row in qa_df.iterrows()]
+        )
 
     # 将结果合并回 qa_df
-    for (idx, response_report) in results:
+    for idx, response_report in results:
         # 确保索引有效
         if idx < len(qa_df):
             qa_df.loc[idx, "raw_result"] = (
@@ -101,13 +107,17 @@ def test_qa(query_paras, args):
         else:
             print(f"Index {idx} is out of range for qa_df.")
 
-    qa_df['pred'] = qa_df['pred'].fillna("No Answer", inplace=False)
+    qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
     qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 
     qa_df.to_csv(save_file_qa, index=False)
 
     acc = get_accuracy_webqsp_qa(save_file_qa)
     print(f"Test Acc {acc}")
+
+    print("Test Acc Raw Result")
+    acc_raw = get_accuracy_webqsp_qa(save_file_qa, pred_col="raw_result")
+    print(f"Test Acc Raw {acc_raw}")
 
 
 if __name__ == "__main__":
@@ -116,12 +126,20 @@ if __name__ == "__main__":
     print_args(args=args)
 
     query_paras = {
-        "strategy": "global",
-        "k_each_level": 5,
-        "k_final": 10,
-        "all_k_inference": 15,
-        "generate_strategy": "direct",
-        "response_type": "QA",
+        "strategy": args.strategy,
+        "k_each_level": args.k_each_level,
+        "k_final": args.k_final,
+        "all_k_inference": args.all_k_inference,
+        "generate_strategy": args.generate_strategy,
+        "response_type": args.response_type,
     }
+    # query_paras = {
+    #     "strategy": "global",
+    #     "k_each_level": 5,
+    #     "k_final": 15,
+    #     "all_k_inference": 15,
+    #     "generate_strategy": "mr",
+    #     "response_type": "QA",
+    # }
 
     test_qa(query_paras, args=args)

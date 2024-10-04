@@ -163,7 +163,7 @@ def community_id_node_resize(
     c_c_mapping = {}
 
     # 遍历 c_n_mapping 中的每个社区
-    for community_id, node_list in c_n_mapping.items():
+    for _, node_list in c_n_mapping.items():
         # 获取 node_list 中每个 node 对应的 title 列表
         community_nodes = []
         for community_id in node_list:
@@ -192,7 +192,7 @@ def community_id_node_resize(
         # 增加 cur_max_id，为下一个社区准备新的编号
         cur_max_id += 1
 
-    return updated_c_n_mapping
+    return updated_c_n_mapping, c_c_mapping
 
 
 def reconstruct_graph(community_df, final_relationships):
@@ -310,18 +310,15 @@ def attr_cluster(
         else:
             c_n_mapping = compute_leiden(cos_graph, args.seed)
 
-        # check for finish
-        number_of_clusters = len(c_n_mapping)
-        if number_of_clusters < min_clusters:
-            break
 
         # 如果不是第一层，需要调整 community_id
         if level > 1:
-            updated_c_n_mapping = community_id_node_resize(
+            updated_c_n_mapping, c_c_mapping = community_id_node_resize(
                 c_n_mapping=c_n_mapping, community_df=community_df
             )
         else:
             updated_c_n_mapping = c_n_mapping
+            c_c_mapping = {}
 
         print(f"Number of communities: {len(updated_c_n_mapping)}")
         c_id_list = list(updated_c_n_mapping.keys())
@@ -355,8 +352,10 @@ def attr_cluster(
             print("Generating new community report.")
             new_community_df = community_report_batch(
                 communities=updated_c_n_mapping,
+                c_c_mapping=c_c_mapping,
                 final_entities=final_entities,
                 final_relationships=final_relationships,
+                exist_community_df=community_df,
                 level_dict=level_dict,
                 error_save_path=tmp_comunity_df_error,
                 args=args,
@@ -369,6 +368,11 @@ def attr_cluster(
         new_community_df.to_csv(tmp_comunity_df_result, index=False)
         community_df = pd.concat([community_df, new_community_df], ignore_index=True)
         level += 1
+        
+        # check for finish
+        number_of_clusters = len(c_n_mapping)
+        if number_of_clusters < min_clusters:
+            break
 
     return community_df
 
@@ -376,8 +380,8 @@ def attr_cluster(
 if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
-    args.max_cluster_size = 0
-
+    print_args(args)
+    
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     community_df = attr_cluster(
         init_graph=graph,

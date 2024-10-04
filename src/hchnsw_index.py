@@ -18,6 +18,7 @@ def save_index(index, index_dir: str, index_name: str):
 def read_index(index_dir: str, index_name: str):
     index_path = os.path.join(index_dir, index_name)
     index = faiss.read_index(index_path)
+    print(f"level of index: {index.hchnsw.max_level}")
     return index
 
 

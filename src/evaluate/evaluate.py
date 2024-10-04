@@ -75,8 +75,13 @@ def eval_hit(prediction, answer):
     return 0
 
 
-def get_accuracy_webqsp_qa(path):
-    # df = pd.read_json(path, lines=True)
+def get_label_pred_list(df, pred_col, label_col):
+    label_list = df[label_col].tolist()
+    pred_list = df[pred_col].tolist()
+    return label_list, pred_list
+
+
+def get_accuracy_webqsp_qa(path, pred_col="pred", label_col="label"):
     df = pd.read_csv(path, na_filter=False)
 
     # Load results
@@ -86,7 +91,9 @@ def get_accuracy_webqsp_qa(path):
     precission_list = []
     recall_list = []
 
-    for prediction, answer in zip(df.pred.tolist(), df.label.tolist()):
+    label_list, pred_list = get_label_pred_list(df, pred_col, label_col)
+
+    for prediction, answer in zip(pred_list, label_list):
 
         prediction = prediction.replace("|", "\n")
         answer = answer.split("|")
@@ -124,3 +131,9 @@ eval_funcs = {
     "webqsp": get_accuracy_webqsp_qa,
     "webqsp_baseline": get_accuracy_webqsp_qa,
 }
+
+if __name__ == "__main__":
+    save_file_qa = (
+        "/mnt/data/wangshu/hcarag/FB15k/hc_index_8b/qa/global_5_10_15_direct_QA_.json"
+    )
+    acc_raw = get_accuracy_webqsp_qa(save_file_qa, pred_col="raw_result")
