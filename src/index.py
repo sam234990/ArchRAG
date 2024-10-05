@@ -35,7 +35,10 @@ def make_hc_index(args):
     community_df.to_csv(c_df_save_path, index=False)
 
     if args.entity_second_embedding:
-        entities_df: pd.DataFrame = entity_embedding(entities_df, args=args)
+        print("Need to compute entity embedding")
+        entities_df: pd.DataFrame = entity_embedding(
+            entities_df, args=args, num_workers=args.num_workers
+        )
         # final_relationships = relation_embedding(final_relationships, args=args)
     else:
         entities_df["embedding"] = entities_df["description_embedding"]

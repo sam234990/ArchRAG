@@ -18,7 +18,7 @@ def prep_community_report_content(
     sub_communities_df=None,
     max_tokens=None,
 ):
-    if (level > 0) and (sub_communities_df is not None):
+    if (level > 1) and (len(sub_communities_df) > 0):
         community_str_list = prep_community_content(
             sub_communities_df, max_tokens=max_tokens
         )
@@ -67,6 +67,8 @@ def extract_community_report(result, community_id):
         and result["summary"]
         and "findings" in result
         and result["findings"]
+        and "rating" in result
+        and result["rating"]
     ):
         return {
             "title": result["title"],
@@ -177,9 +179,15 @@ def reprot_embedding_batch(community_df, args, num_workers=32):
 
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
             embeddings = list(
-                executor.map(
-                    lambda row: get_embedding(row),
-                    [row for _, row in community_df.iterrows()],
+                tqdm(
+                    executor.map(
+                        lambda row: get_embedding(row),
+                        [row for _, row in community_df.iterrows()],
+                    ),
+                    total=len(community_df),
+                    desc="Computing embeddings",
+                    unit="community",
+                    leave=True,
                 )
             )
 
@@ -213,7 +221,7 @@ def community_report_worker(
         final_relationships["head_id"].isin(node_list)
     ]
 
-    if c_c_mapping is not None:
+    if len(c_c_mapping) > 0:
         sub_communities = c_c_mapping.get(str(community_id), [])
         sub_communities_df = exist_community_df[
             exist_community_df["community_id"].isin(sub_communities)
