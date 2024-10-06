@@ -125,9 +125,16 @@ def hcarag_retrieval(
     topk_entity = entity_df[entity_df["index_id"].isin(final_predictions)]
     topk_community = community_df[community_df["index_id"].isin(final_predictions)]
 
-    sel_r_df = relation_df[relation_df["source_index_id"].isin(final_predictions)].copy()
-    topk_related_r = get_topk_related_r(query_embedding, sel_r_df, topk=query_paras['topk_e'])
-    # topk_related_r = pd.DataFrame(columns=relation_df.columns)
+    sel_r_df = relation_df[
+        relation_df["source_index_id"].isin(final_predictions)
+    ].copy()
+    if len(sel_r_df) == 0:
+        topk_related_r = pd.DataFrame(columns=relation_df.columns)
+    else:
+
+        topk_related_r = get_topk_related_r(
+            query_embedding, sel_r_df, topk=query_paras["topk_e"]
+        )
 
     return topk_entity, topk_community, topk_related_r
 
@@ -182,6 +189,7 @@ def hcarag_inference_direct(
 
     retries = 0
     direct_answer = ""
+    raw_result = ""
 
     while retries < max_retries:
         raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=False)
@@ -339,7 +347,7 @@ if __name__ == "__main__":
         "strategy": "global",
         "k_each_level": 5,
         "k_final": 10,
-        "topk_e":args.topk_e,
+        "topk_e": args.topk_e,
         "all_k_inference": 15,
         "generate_strategy": "mr",
         # "generate_strategy": "direct",

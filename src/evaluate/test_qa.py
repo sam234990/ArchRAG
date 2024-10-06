@@ -66,9 +66,12 @@ def test_qa(query_paras, args):
         f"{query_paras['response_type']}_"
     )
     save_file_str += ".json"
-    save_file_qa = os.path.join(args.inference_output_dir, save_file_str)
-    print_args(query_paras, "Query Parameters:")
+    inference_output_dir = args.output_dir +"\qa"
+    os.makedirs(inference_output_dir, exist_ok=True)
+    save_file_qa = os.path.join(inference_output_dir, save_file_str)
     print(f"Save file: {save_file_qa}")
+    
+    print_args(query_paras, "Query Parameters:")
 
     number_works = args.num_workers if not DEBUG_FLAG else 2
     print(f"Number of workers: {number_works}")
@@ -97,14 +100,8 @@ def test_qa(query_paras, args):
     for idx, response_report in results:
         # 确保索引有效
         if idx < len(qa_df):
-            qa_df.loc[idx, "raw_result"] = (
-                response_report["raw_result"]
-                if response_report["raw_result"] != ""
-                else "None"
-            )
-            qa_df.loc[idx, "pred"] = (
-                response_report["pred"] if response_report["pred"] != "" else "None"
-            )
+            qa_df.loc[idx, "raw_result"] = response_report.get("raw_result", "None")
+            qa_df.loc[idx, "pred"] = response_report.get("pred", "None")
         else:
             print(f"Index {idx} is out of range for qa_df.")
 

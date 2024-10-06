@@ -716,13 +716,6 @@ def create_inference_arg_parser():
         default="/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
         help="dataset path for index",
     )
-    parser.add_argument(
-        "--inference_output_dir",
-        type=str,
-        # required=True,
-        default="/mnt/data/wangshu/hcarag/FB15k/hc_index_8b/qa",
-        help="Output dir path for dataset output",
-    )
 
     # attr clustering parameters
     parser.add_argument(

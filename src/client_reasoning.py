@@ -524,6 +524,7 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
 
     retries = 0
     direct_answer = ""
+    raw_result=""
 
     while retries < args.max_retries:
         raw_result = llm_invoker(
