@@ -6,6 +6,7 @@ from src.llm import llm_invoker
 from src.lm_emb import openai_embedding
 from src.hchnsw_index import read_index
 from src.client_reasoning import *
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def hcarag(
@@ -40,6 +41,20 @@ def hcarag(
         query_paras=query_paras,
     )
     return response_report
+
+
+def get_topk_related_r(query_embedding, relation_df, topk=10):
+    embeddings = np.stack(relation_df["embedding"].values)
+    query_embedding = np.array(query_embedding).reshape(1, -1)
+
+    similarities = cosine_similarity(embeddings, query_embedding).flatten()
+
+    relation_df.loc[:, "similarity"] = similarities
+
+    topk = min(topk, len(relation_df))
+    topk_related_r = relation_df.nlargest(topk, "similarity")
+
+    return topk_related_r
 
 
 def hcarag_retrieval(
@@ -110,8 +125,10 @@ def hcarag_retrieval(
     topk_entity = entity_df[entity_df["index_id"].isin(final_predictions)]
     topk_community = community_df[community_df["index_id"].isin(final_predictions)]
 
-    # topk_related_r = relation_df[relation_df["source_index_id"].isin(final_predictions)]
-    topk_related_r = pd.DataFrame(columns=relation_df.columns)
+    sel_r_df = relation_df[relation_df["source_index_id"].isin(final_predictions)].copy()
+    topk_related_r = get_topk_related_r(query_embedding, sel_r_df, topk=query_paras['topk_e'])
+    # topk_related_r = pd.DataFrame(columns=relation_df.columns)
+
     return topk_entity, topk_community, topk_related_r
 
 
@@ -137,10 +154,10 @@ def hcarag_inference(
             query_paras,
             args,
         )
-        
+
     if response_report["pred"] == "":
         response_report["pred"] = "No answer found."
-    
+
     return response_report
 
 
@@ -289,6 +306,20 @@ def load_index(args):
     relation_path = os.path.join(args.output_dir, "relationship_df_index.csv")
     relation_df = pd.read_csv(relation_path)
 
+    # add relation embedding
+    relation_embedding_path = os.path.join(
+        args.output_dir, "relationship_embedding.csv"
+    )
+    relation_embedding_df = pd.read_csv(relation_embedding_path)
+    relation_embedding_df["embedding"] = relation_embedding_df["embedding"].apply(
+        lambda x: np.array(ast.literal_eval(x)) if isinstance(x, str) else x
+    )
+    idx_embed_map = dict(
+        zip(relation_embedding_df["idx"], relation_embedding_df["embedding"])
+    )
+
+    relation_df["embedding"] = relation_df["embedding_idx"].map(idx_embed_map)
+    print("Index loaded successfully.")
     return hc_index, entity_df, community_df, level_summary_df, relation_df
 
 
@@ -308,6 +339,7 @@ if __name__ == "__main__":
         "strategy": "global",
         "k_each_level": 5,
         "k_final": 10,
+        "topk_e":args.topk_e,
         "all_k_inference": 15,
         "generate_strategy": "mr",
         # "generate_strategy": "direct",

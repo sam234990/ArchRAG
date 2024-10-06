@@ -37,12 +37,36 @@ def make_hc_index(args):
     if args.entity_second_embedding:
         print("Need to compute entity embedding")
         entities_df: pd.DataFrame = entity_embedding(
-            entities_df, args=args, num_workers=args.num_workers
+            entities_df,
+            args=args,
+            num_workers=args.embedding_num_workers,
+            embed_colname="embedding",
         )
-        # final_relationships = relation_embedding(final_relationships, args=args)
+        final_relationships, r_embedding_df = relation_embedding(
+            final_relationships,
+            args=args,
+            e_colname="description",
+            embed_colname="embedding",
+            num_workers=args.embedding_num_workers,
+            embed_in_ori=False,
+        )
     else:
         entities_df["embedding"] = entities_df["description_embedding"]
-        # final_relationships["embedding"] = final_relationships["relation_embedding"]
+        first_occurrences = final_relationships.drop_duplicates(
+            subset="description", keep="first"
+        )
+        r_embedding_df = first_occurrences[["description", "relation_embedding"]].copy()
+        r_embedding_df["idx"] = range(len(r_embedding_df))
+        r_embedding_df.rename(
+            columns={
+                "relation_embedding": "embedding",
+            },
+            inplace=True,
+        )
+        uni_idx_map = dict(zip(r_embedding_df["description"], r_embedding_df["idx"]))
+        final_relationships["embedding_idx"] = final_relationships["description"].map(
+            uni_idx_map
+        )
 
     final_community_df, final_entity_df = create_hchnsw_index(
         community_df=community_df, entity_df=entities_df, save_path=args.output_dir
@@ -75,6 +99,8 @@ def make_hc_index(args):
 
     f_r_save_path = os.path.join(args.output_dir, "relationship_df_index.csv")
     final_relationships.to_csv(f_r_save_path, index=False)
+    f_r_e_save_path = os.path.join(args.output_dir, "relationship_embedding.csv")
+    r_embedding_df.to_csv(f_r_e_save_path, index=False)
     print("finish save relationship_df")
 
     print("finish compute HCa RAG index")

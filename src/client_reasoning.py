@@ -398,7 +398,7 @@ def prep_map_content(
     return all_chunks
 
 
-def map_llm_worker(content, args):
+def map_llm_worker(content, args)->list[Dict[str, Any]]:
     retries = 0
     points_data = []  # List to hold the descriptions and scores
 
@@ -434,7 +434,7 @@ def map_llm_worker(content, args):
     return points_data
 
 
-def map_inference(entity_df, relation_df, community_df, query, args):
+def map_inference(entity_df, relation_df, community_df, query, args, parallel_flag=False):
     all_chunks = prep_map_content(
         entity_df=entity_df,
         relation_df=relation_df,
@@ -442,19 +442,27 @@ def map_inference(entity_df, relation_df, community_df, query, args):
         query=query,
         max_tokens=args.max_tokens,
     )
+    if parallel_flag == False:
+        all_result = []
+        for chunk in all_chunks:
+            res = map_llm_worker(chunk, args)
+            all_result.extend(res)
+        
+        res_df = pd.DataFrame(all_result)
+        return res_df
+    else:
+        max_workers = max(len(all_chunks), args.num_workers)
 
-    max_workers = max(len(all_chunks), args.num_workers)
+        with mp.Pool(processes=max_workers) as pool:
+            results = pool.starmap(
+                map_llm_worker,
+                [(chunk, args) for chunk in all_chunks],
+            )
 
-    with mp.Pool(processes=max_workers) as pool:
-        results = pool.starmap(
-            map_llm_worker,
-            [(chunk, args) for chunk in all_chunks],
-        )
+        # Flatten the results to a 1D list
+        flattened_results = [item for sublist in results for item in sublist]
 
-    # Flatten the results to a 1D list
-    flattened_results = [item for sublist in results for item in sublist]
-
-    res_df = pd.DataFrame(flattened_results)
+        res_df = pd.DataFrame(flattened_results)
     return res_df
 
 

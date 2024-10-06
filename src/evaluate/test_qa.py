@@ -60,6 +60,7 @@ def test_qa(query_paras, args):
         f"{query_paras['strategy']}_"
         f"{query_paras['k_each_level']}_"
         f"{query_paras['k_final']}_"
+        f"{query_paras['topk_e']}_"
         f"{query_paras['all_k_inference']}_"
         f"{query_paras['generate_strategy']}_"
         f"{query_paras['response_type']}_"
@@ -129,6 +130,7 @@ if __name__ == "__main__":
         "strategy": args.strategy,
         "k_each_level": args.k_each_level,
         "k_final": args.k_final,
+        "topk_e": args.topk_e,
         "all_k_inference": args.all_k_inference,
         "generate_strategy": args.generate_strategy,
         "response_type": args.response_type,

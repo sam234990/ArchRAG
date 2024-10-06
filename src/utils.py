@@ -417,10 +417,11 @@ def relation_embedding(
     e_colname="description",
     embed_colname="embedding",
     num_workers=32,
+    embed_in_ori=True,
 ):
     if embed_colname in relation_df.columns:
         print(f"column name :{embed_colname} existing")
-        return relation_df
+        return relation_df, None
 
     relation_df[e_colname] = relation_df[e_colname].fillna("N")
     # 提取唯一描述
@@ -446,13 +447,27 @@ def relation_embedding(
                     leave=True,  # 保持进度条显示在输出中
                 )
             )
+    # 构建 unique_embedding_df，包括 e_colname, embedding, 和 idx 三列
+    unique_embedding_df = pd.DataFrame(
+        {
+            e_colname: unique_descriptions,
+            embed_colname: embeddings,
+        }
+    )
+    # 添加 idx 列，代表每个描述的唯一索引
+    unique_embedding_df["idx"] = range(len(unique_embedding_df))
+
     # 创建一个映射从描述到嵌入
-    embedding_mapping = dict(zip(unique_descriptions, embeddings))
+    uni_embed_map = dict(zip(unique_descriptions, embeddings))
+    uni_idx_map = dict(zip(unique_descriptions, range(len(unique_descriptions))))
 
     # 将嵌入合并回原 DataFrame
-    relation_df[embed_colname] = relation_df[e_colname].map(embedding_mapping)
+    if embed_in_ori:
+        relation_df[embed_colname] = relation_df[e_colname].map(uni_embed_map)
+    else:
+        relation_df["embedding_idx"] = relation_df[e_colname].map(uni_idx_map)
 
-    return relation_df
+    return relation_df, unique_embedding_df
 
 
 def create_arg_parser():
@@ -617,6 +632,12 @@ def create_arg_parser():
         # required=True,
         default="http://localhost:5000/forward",
         help="Base URL for the API service",
+    )
+    parser.add_argument(
+        "--embedding_num_workers",
+        type=int,
+        default=48,
+        help="Number of workers to use for parallel processing",
     )
 
     parser.add_argument(
@@ -789,6 +810,12 @@ def create_inference_arg_parser():
         default="http://localhost:5000/forward",
         help="Base URL for the API service",
     )
+    parser.add_argument(
+        "--embedding_num_workers",
+        type=int,
+        default=48,
+        help="Number of workers to use for parallel processing",
+    )
 
     parser.add_argument(
         "--entity_second_embedding",
@@ -824,6 +851,13 @@ def create_inference_arg_parser():
         "--k_final",
         type=int,
         default=15,
+        help="Number of k for final",
+    )
+
+    parser.add_argument(
+        "--topk_e",
+        type=int,
+        default=10,
         help="Number of k for final",
     )
 
@@ -874,7 +908,7 @@ def print_args(args, print_str="Parsed Arguments:"):
     elif type(args) == dict:
         for arg, value in args.items():
             print(f"{arg}: {value}")
-    
+
 
 if __name__ == "__main__":
     base_path = "/home/wangshu/rag/graphrag/ragtest/output/20240813-220313/artifacts"

@@ -295,7 +295,9 @@ def community_report_batch(
             raise  # 重新抛出异常以终止处理
 
     community_df = pd.DataFrame(results_community)
-    community_df = reprot_embedding_batch(community_df, args)
+    community_df = reprot_embedding_batch(
+        community_df, args, num_workers=args.embedding_num_workers
+    )
 
     return community_df
 
