@@ -375,6 +375,7 @@ def prep_map_content(
     query,
     max_tokens=None,
 ) -> str:
+    er_chunk = []
     if not entity_df.empty:
         e_r_prefix = (
             "Here is a community consisting of the following entities and their "

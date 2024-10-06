@@ -116,7 +116,11 @@ def hcarag_retrieval(
     all_results = sorted(all_results, key=lambda x: x[0])
 
     # 获取最终的 top-k 结果
-    final_results = all_results[:final_k]
+    if query_paras['generate_strategy'] == "mr":
+        # map-reduce use all the result
+        final_results = all_results
+    else:
+        final_results = all_results[:final_k]
 
     # 提取最终的预测值（实体索引）
     final_predictions = [pred for _, pred in final_results]

@@ -66,11 +66,11 @@ def test_qa(query_paras, args):
         f"{query_paras['response_type']}_"
     )
     save_file_str += ".json"
-    inference_output_dir = args.output_dir +"\qa"
+    inference_output_dir = args.output_dir + "/qa"
     os.makedirs(inference_output_dir, exist_ok=True)
     save_file_qa = os.path.join(inference_output_dir, save_file_str)
     print(f"Save file: {save_file_qa}")
-    
+
     print_args(query_paras, "Query Parameters:")
 
     number_works = args.num_workers if not DEBUG_FLAG else 2
