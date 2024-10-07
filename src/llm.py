@@ -10,6 +10,8 @@ log = logging.getLogger(__name__)
 def llm_invoker(
     input_text, args, temperature=0.7, max_tokens=4000, max_retries=5, json=False
 ):
+    if hasattr(args, "temperature"):
+        temperature = args.temperature
 
     if "llama" in args.engine.lower():
         api_key = "ollama"

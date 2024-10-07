@@ -585,6 +585,13 @@ def create_arg_parser():
     )
 
     parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.1,
+        help="Temperature for Large Language Model",
+    )
+
+    parser.add_argument(
         "--max_community_tokens",
         type=int,
         default=4000,
@@ -752,6 +759,13 @@ def create_inference_arg_parser():
 
     parser.add_argument(
         "--max_tokens", type=int, default=4000, help="Maximum tokens to generate"
+    )
+    
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.1,
+        help="Temperature for Large Language Model",
     )
 
     parser.add_argument(
