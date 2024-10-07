@@ -53,6 +53,8 @@ def eval_f1(prediction, answer):
         if match(prediction_str, a):
             matched += 1
     precision = matched / len(prediction)
+    if precision > 1:
+        precision = 1
     recall = matched / len(answer)
     if precision + recall == 0:
         return 0, precision, recall

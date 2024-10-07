@@ -478,7 +478,7 @@ def prep_reduce_content(map_response_df: pd.DataFrame, max_tokens=None) -> str:
                 {
                     "analyst": index,
                     "answer": row["answer"],
-                    "score": row["score"],
+                    "score": float(row["score"]),
                 }
             )
 

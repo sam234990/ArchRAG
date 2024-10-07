@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 
 
 def llm_invoker(
-    input_text, args, temperature=0.7, max_tokens=1500, max_retries=5, json=False
+    input_text, args, temperature=0.7, max_tokens=4000, max_retries=5, json=False
 ):
 
     if "llama" in args.engine.lower():

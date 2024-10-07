@@ -65,7 +65,7 @@ def test_qa(query_paras, args):
         f"{query_paras['generate_strategy']}_"
         f"{query_paras['response_type']}_"
     )
-    save_file_str += ".json"
+    save_file_str += ".csv"
     inference_output_dir = args.output_dir + "/qa"
     os.makedirs(inference_output_dir, exist_ok=True)
     save_file_qa = os.path.join(inference_output_dir, save_file_str)
@@ -76,6 +76,7 @@ def test_qa(query_paras, args):
     number_works = args.num_workers if not DEBUG_FLAG else 2
     print(f"Number of workers: {number_works}")
     print(f"Number of questions: {len(qa_df)}")
+    print(f"Number of questions per process: {len(qa_df) / number_works}")
 
     # 创建进程池
     with mp.Pool(processes=number_works) as pool:
@@ -99,12 +100,13 @@ def test_qa(query_paras, args):
     # 将结果合并回 qa_df
     for idx, response_report in results:
         # 确保索引有效
-        if idx < len(qa_df):
+        if isinstance(response_report, dict):
             qa_df.loc[idx, "raw_result"] = response_report.get("raw_result", "None")
             qa_df.loc[idx, "pred"] = response_report.get("pred", "None")
         else:
-            print(f"Index {idx} is out of range for qa_df.")
-
+            qa_df.loc[idx, "raw_result"] = "None"
+            qa_df.loc[idx, "pred"] = "None"
+        
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
     qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 
