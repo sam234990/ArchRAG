@@ -63,7 +63,7 @@ def problem_reasoning(
 
 
 def prep_level_infer_content(
-    query_content, entity_df, community_df, level_summary_df, max_level, max_tokens=None
+    query_content, entity_df, community_df, level_summary_df, max_level, max_tokens=4096
 ) -> str:
     index_conent = f"""
 Max level: {max_level}
@@ -145,7 +145,7 @@ def extract_level(level_output, num_level) -> Tuple[Dict[str, Any], bool]:
 
 
 def prep_level_content(
-    level, max_level, community_df, sample_size=3, max_tokens=None
+    level, max_level, community_df, sample_size=3, max_tokens=4096
 ) -> str:
     level_content = f"""
 Max level: {max_level}
@@ -252,7 +252,7 @@ def trim_e_r_content(community_nodes, relationships):
     return context
 
 
-def prep_e_r_content(entity_df, relation_df, max_tokens=None):
+def prep_e_r_content(entity_df, relation_df, max_tokens=4096):
     if entity_df.empty:
         return [COMMUNITY_CONTEXT]
 
@@ -318,7 +318,7 @@ def prep_e_r_content(entity_df, relation_df, max_tokens=None):
 
 
 def prep_infer_content(
-    entity_df, relation_df, community_df, query, max_tokens=None, response_type="QA"
+    entity_df, relation_df, community_df, query, max_tokens=4096, response_type="QA"
 ) -> str:
 
     res_content = ""
@@ -341,7 +341,7 @@ def prep_infer_content(
     return res_content.strip()
 
 
-def prep_community_content(community_df, max_tokens=None) -> list[str]:
+def prep_community_content(community_df, max_tokens=4096) -> list[str]:
     community_str = """
 id|title|content|rank \n
 """
@@ -373,7 +373,7 @@ def prep_map_content(
     relation_df: pd.DataFrame,
     community_df: pd.DataFrame,
     query,
-    max_tokens=None,
+    max_tokens=4096,
 ) -> str:
     er_chunk = []
     if not entity_df.empty:
@@ -467,7 +467,7 @@ def map_inference(entity_df, relation_df, community_df, query, args, parallel_fl
     return res_df
 
 
-def prep_reduce_content(map_response_df: pd.DataFrame, max_tokens=None) -> str:
+def prep_reduce_content(map_response_df: pd.DataFrame, max_tokens=4096) -> str:
     # collect all key points into a single list to prepare for sorting
     key_points = []
     for index, row in map_response_df.iterrows():

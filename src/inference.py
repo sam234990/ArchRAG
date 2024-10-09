@@ -98,8 +98,8 @@ def hcarag_retrieval(
 
     all_results = []
 
-    # for level in range(hc_level + 1):
-    for level in range(3):
+    for level in range(hc_level + 1):
+    # for level in range(3):
         saerch_params = faiss.SearchParametersHCHNSW()
         saerch_params.search_level = level
         distances, preds = hc_index.search(

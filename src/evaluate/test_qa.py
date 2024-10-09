@@ -47,6 +47,7 @@ def process_question(
 
 
 def test_qa(query_paras, args):
+    # 1. load dataset and index
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     qa_df = load_datasets(args.dataset_path)
 
@@ -106,7 +107,7 @@ def test_qa(query_paras, args):
         else:
             qa_df.loc[idx, "raw_result"] = "None"
             qa_df.loc[idx, "pred"] = "None"
-        
+
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
     qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 
@@ -118,6 +119,137 @@ def test_qa(query_paras, args):
     print("Test Acc Raw Result")
     acc_raw = get_accuracy_webqsp_qa(save_file_qa, pred_col="raw_result")
     print(f"Test Acc Raw {acc_raw}")
+
+
+def process_retrieval(
+    idx,
+    row,
+    hc_index,
+    entity_df,
+    community_df,
+    level_summary_df,
+    relation_df,
+    query_paras,
+    args,
+):
+    question = row["question"]
+    if (idx % 100 == 0) and args.print_log:
+        print(f"Processing question at index {idx}: {question}")
+    try:
+
+        topk_entity, topk_community, topk_related_r = hcarag_retrieval(
+            query_content=question,
+            hc_index=hc_index,
+            entity_df=entity_df,
+            community_df=community_df,
+            level_summary_df=level_summary_df,
+            relation_df=relation_df,
+            query_paras=query_paras,
+            args=args,
+        )
+        res_row = row.copy()
+        e_r_content = prep_e_r_content(topk_entity, topk_related_r, max_tokens=args.max_tokens)
+        c_content = prep_community_content(topk_community, max_tokens=args.max_tokens)
+
+        e_r_content = " ".join(e_r_content)
+        c_content = " ".join(c_content)
+        
+        res_row['e_r_content'] = e_r_content
+        res_row['c_content'] = c_content
+        
+        e_r_cnt = 0
+        c_cnt = 0
+        ans_list = row["answers"]
+
+        for answer_item in ans_list:
+            if answer_item in e_r_content:
+                e_r_cnt += 1
+                break
+
+        for answer_item in ans_list:
+            if answer_item in c_content:
+                c_cnt += 1
+                break
+
+        res_row["e_r_cnt"] = e_r_cnt
+        res_row["c_cnt"] = c_cnt
+        res_row["cnt"] = 1 if (e_r_cnt + c_cnt) > 0 else 0
+        return idx, res_row
+    except Exception as e:
+        logging.error(f"Error processing question at index {idx}: {e}")
+        return idx, None
+
+
+def eval_retrieval(query_paras, args):
+    hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
+    qa_df = load_datasets(args.dataset_path)
+
+    # 重置索引，确保连续性
+    qa_df.reset_index(drop=True, inplace=True)
+
+    DEBUG_FLAG = args.debug_flag
+    qa_df = qa_df.iloc[:10] if DEBUG_FLAG else qa_df
+
+    save_file_str = (
+        f"{query_paras['strategy']}_"
+        f"{query_paras['k_each_level']}_"
+        f"{query_paras['k_final']}_"
+        f"{query_paras['topk_e']}_"
+        f"{query_paras['all_k_inference']}_"
+        f"{query_paras['generate_strategy']}_"
+        f"{query_paras['response_type']}_"
+    )
+    save_file_str += ".csv"
+    inference_output_dir = "/home/wangshu/rag/hier_graph_rag/test/debug_file"
+    save_file_qa = os.path.join(inference_output_dir, save_file_str)
+    print(f"Save file: {save_file_qa}")
+
+    print_args(query_paras, "Query Parameters:")
+
+    number_works = args.num_workers if not DEBUG_FLAG else 2
+    print(f"Number of workers: {number_works}")
+    print(f"Number of questions: {len(qa_df)}")
+    print(f"Number of questions per process: {len(qa_df) / number_works}")
+
+    # 创建进程池
+    with mp.Pool(processes=number_works) as pool:
+        # 准备每个问题的输入参数
+        process_func = partial(
+            process_retrieval,
+            hc_index=hc_index,
+            entity_df=entity_df,
+            community_df=community_df,
+            level_summary_df=level_summary_df,
+            relation_df=relation_df,
+            query_paras=query_paras,
+            args=args,
+        )
+
+        # 使用 enumerate 处理每个问题，确保索引正确
+        results = pool.starmap(
+            process_func, [(idx, row) for idx, row in qa_df.iterrows()]
+        )
+
+    valid_results = [(idx, res_row) for idx, res_row in results if res_row is not None]
+
+    # 提取索引和有效行的数据
+    _, rows = zip(*valid_results)
+
+    # 将有效行转换为 DataFrame
+    res_df = pd.DataFrame(rows)
+    all_question = len(res_df)
+    sum_e_r = res_df["e_r_cnt"].sum()
+    sum_c = res_df["c_cnt"].sum()
+    sum_all = res_df["cnt"].sum()
+    print(f"all question number is {all_question}")
+    print(
+        f"retrieval entity and relation with answer :{sum_e_r}, ratio: {sum_e_r / all_question}"
+    )
+    print(f"retrieval community with answer :{sum_c}, ratio: {sum_c / all_question}")
+    print(
+        f"retrieval information with answer :{sum_all}, ratio: {sum_all / all_question}"
+    )
+    
 
 
 if __name__ == "__main__":
@@ -144,3 +276,4 @@ if __name__ == "__main__":
     # }
 
     test_qa(query_paras, args=args)
+    # eval_retrieval(query_paras, args=args)
