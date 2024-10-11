@@ -74,7 +74,7 @@ def test_qa(query_paras, args):
 
     print_args(query_paras, "Query Parameters:")
 
-    number_works = args.num_workers if not DEBUG_FLAG else 2
+    number_works = args.num_workers if not DEBUG_FLAG else 1
     print(f"Number of workers: {number_works}")
     print(f"Number of questions: {len(qa_df)}")
     print(f"Number of questions per process: {len(qa_df) / number_works}")
@@ -148,15 +148,17 @@ def process_retrieval(
             args=args,
         )
         res_row = row.copy()
-        e_r_content = prep_e_r_content(topk_entity, topk_related_r, max_tokens=args.max_tokens)
+        e_r_content = prep_e_r_content(
+            topk_entity, topk_related_r, max_tokens=args.max_tokens
+        )
         c_content = prep_community_content(topk_community, max_tokens=args.max_tokens)
 
         e_r_content = " ".join(e_r_content)
         c_content = " ".join(c_content)
-        
-        res_row['e_r_content'] = e_r_content
-        res_row['c_content'] = c_content
-        
+
+        res_row["e_r_content"] = e_r_content
+        res_row["c_content"] = c_content
+
         e_r_cnt = 0
         c_cnt = 0
         ans_list = row["answers"]
@@ -249,7 +251,6 @@ def eval_retrieval(query_paras, args):
     print(
         f"retrieval information with answer :{sum_all}, ratio: {sum_all / all_question}"
     )
-    
 
 
 if __name__ == "__main__":
@@ -259,6 +260,7 @@ if __name__ == "__main__":
 
     query_paras = {
         "strategy": args.strategy,
+        "only_entity":args.only_entity,
         "k_each_level": args.k_each_level,
         "k_final": args.k_final,
         "topk_e": args.topk_e,

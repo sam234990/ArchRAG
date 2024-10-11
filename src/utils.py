@@ -64,7 +64,7 @@ def read_graph_nx(
     graph = nx.Graph()
     for _, row in final_entities.iterrows():
         # graph.add_node(row["name"], **row.to_dict())
-        graph.add_node(row["human_readable_id"], **row.to_dict())
+        graph.add_node(row["human_readable_id"])
 
     for _, row in relationships.iterrows():
         # graph.add_edge(row["source"], row["target"], weight=row["weight"])
@@ -760,7 +760,7 @@ def create_inference_arg_parser():
     parser.add_argument(
         "--max_tokens", type=int, default=4000, help="Maximum tokens to generate"
     )
-    
+
     parser.add_argument(
         "--temperature",
         type=float,
@@ -873,6 +873,13 @@ def create_inference_arg_parser():
         type=int,
         default=15,
         help="Number of k for all inference",
+    )
+
+    parser.add_argument(
+        "--only_entity",
+        type=lambda x: x.lower() == "true",
+        default=False,
+        help="only use entity to inference"
     )
 
     parser.add_argument(

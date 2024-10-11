@@ -98,8 +98,12 @@ def hcarag_retrieval(
 
     all_results = []
 
-    for level in range(hc_level + 1):
-    # for level in range(3):
+    if query_paras["only_entity"] is True:
+        query_max_levl = 1
+    else:
+        query_max_levl = hc_level + 1
+
+    for level in range(query_max_levl):
         saerch_params = faiss.SearchParametersHCHNSW()
         saerch_params.search_level = level
         distances, preds = hc_index.search(
@@ -116,8 +120,10 @@ def hcarag_retrieval(
     # 根据距离排序，选择距离最小的 final_k 个结果
     all_results = sorted(all_results, key=lambda x: x[0])
 
+    final_k = min(len(all_results), final_k)
+
     # 获取最终的 top-k 结果
-    if query_paras['generate_strategy'] == "mr":
+    if query_paras["generate_strategy"] == "mr":
         # map-reduce use all the result
         final_results = all_results
     else:
