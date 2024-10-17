@@ -3,9 +3,10 @@ k_each_level=10
 k_final=20
 topk_e=10
 all_k_inference=15
-generate_strategy="mr"
-# generate_strategy="direct"
+# generate_strategy="mr"
+generate_strategy="direct"
 response_type="QA"
+
 temperature=0.1
 only_entity=False
 num_workers=24

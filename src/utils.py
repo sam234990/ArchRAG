@@ -66,9 +66,10 @@ def read_graph_nx(
         # graph.add_node(row["name"], **row.to_dict())
         graph.add_node(row["human_readable_id"])
 
-    for _, row in relationships.iterrows():
+    add_weight = "weight" in relationships.columns
+    for _, row in tqdm(relationships.iterrows(), total=relationships.shape[0]):
         # graph.add_edge(row["source"], row["target"], weight=row["weight"])
-        if "weight" in row:
+        if add_weight in row:
             graph.add_edge(row["head_id"], row["tail_id"], weight=row["weight"])
         else:
             graph.add_edge(row["head_id"], row["tail_id"])
@@ -76,7 +77,9 @@ def read_graph_nx(
     # process embedding
     final_entities["description_embedding"] = final_entities[
         "description_embedding"
-    ].apply(lambda x: np.array(ast.literal_eval(x)) if isinstance(x, str) else x)
+    ].apply(
+        lambda x: np.fromstring(x.strip("[]"), sep=",") if isinstance(x, str) else x
+    )
     # add embedding to graph
     for _, row in final_entities.iterrows():
         # graph.nodes[row["name"]]["embedding"] = row["description_embedding"]
@@ -474,6 +477,9 @@ def create_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for the project."
     )
+    
+    parser.add_argument("--project", type=str, default="hcarag")
+    
 
     parser.add_argument(
         "--base_path",
@@ -683,6 +689,8 @@ def create_inference_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for inference."
     )
+    
+    parser.add_argument("--project", type=str, default="hcarag")
 
     # index
     parser.add_argument(
@@ -879,7 +887,7 @@ def create_inference_arg_parser():
         "--only_entity",
         type=lambda x: x.lower() == "true",
         default=False,
-        help="only use entity to inference"
+        help="only use entity to inference",
     )
 
     parser.add_argument(

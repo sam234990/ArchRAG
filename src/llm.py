@@ -44,7 +44,13 @@ def llm_invoker(
     if json:
         parameters["response_format"] = {"type": "json_object"}
 
-    print("start openai")
+    if hasattr(args, "debug_flag"):
+        p_flag = args.debug_flag
+    else:
+        p_flag = False
+        
+    if p_flag:
+        print("start openai")
     retries = 0
     success = False
     result = None
@@ -64,7 +70,8 @@ def llm_invoker(
         # 可以抛出异常或返回 None
         raise Exception("Failed to get a response from OpenAI after multiple retries.")
 
-    print("end openai")
+    if p_flag:
+        print("end openai")
     return result
 
 

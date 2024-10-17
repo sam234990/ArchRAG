@@ -2,6 +2,7 @@ import pandas as pd
 import multiprocessing as mp
 from functools import partial
 import logging
+import wandb
 
 from src.inference import *
 from src.utils import create_inference_arg_parser
@@ -47,6 +48,12 @@ def process_question(
 
 
 def test_qa(query_paras, args):
+    
+    # TODO: change the name and project
+    wandb.init(project=f"{args.project}",
+               name=f"{args.dataset}_{args.model_name}",
+               config=args)
+    
     # 1. load dataset and index
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     qa_df = load_datasets(args.dataset_path)
@@ -119,6 +126,7 @@ def test_qa(query_paras, args):
     print("Test Acc Raw Result")
     acc_raw = get_accuracy_webqsp_qa(save_file_qa, pred_col="raw_result")
     print(f"Test Acc Raw {acc_raw}")
+    wandb.log({'Test Acc': acc_raw})
 
 
 def process_retrieval(

@@ -4,12 +4,15 @@ import os
 # 添加 src 文件夹到 sys.path
 src_path = "/home/wangshu/rag/hier_graph_rag"
 sys.path.append(os.path.abspath(src_path))
+os.environ["WANDB_MODE"] = "offline"
 
 from src.llm import llm_invoker
 from src.evaluate.evaluate import get_accuracy_webqsp_qa
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
+import argparse
+import wandb
 
 
 def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_args):
@@ -32,8 +35,15 @@ def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_a
     return results
 
 
-def run_zero_cot_llm(dataset: pd.DataFrame, strategy, save_dir, num_workers=24):
+def run_zero_cot_llm(
+    dataset: pd.DataFrame, strategy, save_dir, args=None, num_workers=12
+):
     print(f"Running {strategy} strategy")
+    
+    wandb.init(
+        project=f"{args.project}", name=f"{args.dataset_name}_{args.strategy}", config=args
+    )
+
     if strategy == "zero-shot":
         prompt = " \n Answer: "
     elif strategy == "cot":
@@ -65,6 +75,8 @@ def run_zero_cot_llm(dataset: pd.DataFrame, strategy, save_dir, num_workers=24):
 
     acc = get_accuracy_webqsp_qa(save_path)
     print(f"Test Acc : {acc}")
+    wandb.log({"Test Acc": acc})
+    
 
 
 class Args:
@@ -75,14 +87,43 @@ class Args:
 
 
 if __name__ == "__main__":
-    dataset_path = "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json"
+    parser = argparse.ArgumentParser()
+
+    dataset_path_dict = {
+        "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
+        "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
+    }
+
+    save_path_dict = {
+        "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/baseline",
+        "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
+    }
+
+    parser.add_argument("--project", type=str, default="hcarag")
+
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        choices=dataset_path_dict.keys(),  # 只允许选择这两个数据集
+        default="mintaka",
+        help=f"Select the dataset name. Options are: {' '.join(dataset_path_dict.keys())}",
+    )
+
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="zero-shot",
+    )
+
+    args = parser.parse_args()
+
+    strategy = args.strategy
+    dataset_path = dataset_path_dict[args.dataset_name]
+    save_dir = save_path_dict[args.dataset_name]
+
+    # Read dataset
     dataset = pd.read_json(dataset_path, lines=True, orient="records")
     dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
 
-    strategy = "zero-shot"
-    # strategy = "cot"
-
-    save_dir = "/mnt/data/wangshu/hcarag/mintaka/QA/baseline"
-
-    run_zero_cot_llm(dataset, strategy, save_dir=save_dir)
+    run_zero_cot_llm(dataset, strategy, save_dir=save_dir, args=args)

@@ -1,6 +1,6 @@
-temperature=0.8
+temperature=0.1
 
-log_file="./inference_res/gr_mintaka_${temperature}.log"
+log_file="./inference_res/gr_webq_${temperature}.log"
 python_file="/home/wangshu/rag/hier_graph_rag/other_baseline/g-retrieval/inference_only_llm.py"
 
 # 设置PYTHONPATH

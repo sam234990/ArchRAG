@@ -9,14 +9,51 @@ from src.utils.evaluate import get_accuracy_webqsp
 import multiprocessing as mp
 from torch.utils.data import Subset
 from src.llm import llm_invoker
+import tiktoken
+
+
+def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int:
+    """Return the number of tokens in the given text."""
+    if token_encoder is None:
+        token_encoder = tiktoken.get_encoding("cl100k_base")
+    return len(token_encoder.encode(text))  # type: ignore
+
+
+def truncate_to_n_tokens(
+    text: str, max_tokens: int, token_encoder: tiktoken.Encoding | None = None
+) -> str:
+    """Return the first `max_tokens` tokens from the given text using binary search."""
+    if token_encoder is None:
+        token_encoder = tiktoken.get_encoding("cl100k_base")
+
+    tokens = token_encoder.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+
+    # Binary search to find the appropriate cut-off point
+    low, high = 0, len(text)
+    while low < high:
+        mid = (low + high) // 2
+        if num_tokens(text[:mid], token_encoder) <= max_tokens:
+            low = mid + 1
+        else:
+            high = mid
+
+    return text[:high]
 
 
 def process_worker(dataset_part, llm_invoker_args):
     results = []
 
     for i, data in enumerate(dataset_part):
-        query_content = data["question"] + data["desc"][:512]
-        llm_res = llm_invoker(query_content, args=llm_invoker_args, temperature=llm_invoker_args.temperature)
+        # Truncate data["desc"] to the first 512 tokens
+        truncated_desc = truncate_to_n_tokens(data["desc"], 512)
+        query_content = data["question"] + truncated_desc
+        llm_res = llm_invoker(
+            query_content,
+            args=llm_invoker_args,
+            temperature=llm_invoker_args.temperature,
+        )
         tmp_res = {
             "id": data["id"],
             "question": data["question"],
@@ -31,7 +68,7 @@ def process_worker(dataset_part, llm_invoker_args):
 
 
 def main(args):
-    dataset_name = "mintaka"
+    dataset_name = "webqsp"
     dataset = load_dataset[dataset_name]()
     # Step 2: 并行处理设置
     num_workers = 20  # 设定并行的进程数量

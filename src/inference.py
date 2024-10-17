@@ -312,7 +312,7 @@ def calculate_k_per_level(level_weight, all_k):
 def load_index(args):
 
     hc_index = read_index(args.output_dir, "hchnsw.index")
-
+ 
     entity_path = os.path.join(args.output_dir, "entity_df_index.csv")
     entity_df = pd.read_csv(entity_path)
 

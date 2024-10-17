@@ -12,6 +12,7 @@ README.txt
 
 __pycache__/
 # other_baseline/
+wandb/
 
 .vscode/
 test/
