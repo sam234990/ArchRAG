@@ -477,9 +477,8 @@ def create_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for the project."
     )
-    
+
     parser.add_argument("--project", type=str, default="hcarag")
-    
 
     parser.add_argument(
         "--base_path",
@@ -689,7 +688,7 @@ def create_inference_arg_parser():
     parser = argparse.ArgumentParser(
         description="All the arguments needed for inference."
     )
-    
+
     parser.add_argument("--project", type=str, default="hcarag")
 
     # index
@@ -730,6 +729,14 @@ def create_inference_arg_parser():
         # required=True,
         default="/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
         help="dataset path for index",
+    )
+
+    parser.add_argument(
+        "--eval_mode",
+        type=str,
+        choices=["KGQA", "DocQA"],
+        default="KGQA",
+        help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
     )
 
     # attr clustering parameters

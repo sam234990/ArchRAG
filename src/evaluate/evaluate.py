@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import re
 import string
+from collections import Counter
 
 
 def get_accuracy_gqa(path):
@@ -122,6 +123,103 @@ def get_accuracy_webqsp_qa(path, pred_col="pred", label_col="label"):
     print(f"Precision: {pre:.4f}")
     print(f"Recall: {recall:.4f}")
     print(f"F1: {f1:.4f}")
+
+    return hit
+
+
+def normalize_answer(s):
+    def remove_articles(text):
+        return re.sub(r"\b(a|an|the)\b", " ", text)
+
+    def white_space_fix(text):
+        return " ".join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return "".join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+
+def f1_score(prediction, ground_truth):
+    normalized_prediction = normalize_answer(prediction)
+    normalized_ground_truth = normalize_answer(ground_truth)
+
+    ZERO_METRIC = (0, 0, 0)
+
+    if (
+        normalized_prediction in ["yes", "no", "noanswer"]
+        and normalized_prediction != normalized_ground_truth
+    ):
+        return ZERO_METRIC
+    if (
+        normalized_ground_truth in ["yes", "no", "noanswer"]
+        and normalized_prediction != normalized_ground_truth
+    ):
+        return ZERO_METRIC
+
+    prediction_tokens = normalized_prediction.split()
+    ground_truth_tokens = normalized_ground_truth.split()
+    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+    num_same = sum(common.values())
+    if num_same == 0:
+        return ZERO_METRIC
+    precision = 1.0 * num_same / len(prediction_tokens)
+    recall = 1.0 * num_same / len(ground_truth_tokens)
+    f1 = (2 * precision * recall) / (precision + recall)
+    return f1, precision, recall
+
+
+def exact_match_score(prediction, ground_truth):
+    bool1 = normalize_answer(prediction) == normalize_answer(ground_truth)
+    bool2 = normalize(prediction) == normalize(ground_truth)
+    return 1 if bool1 or bool2 else 0
+
+
+def update_answer(prediction, answer):
+    em = exact_match_score(prediction, answer)
+    f1, precision, recall = f1_score(prediction, answer)
+    return em, f1, precision, recall
+
+
+def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
+    df = pd.read_csv(path, na_filter=False)
+
+    # Load results
+    hit_list = []
+    f1_list = []
+    precission_list = []
+    recall_list = []
+    em_list = []
+
+    label_list, pred_list = get_label_pred_list(df, pred_col, label_col)
+    for prediction, answer in zip(pred_list, label_list):
+
+        prediction = prediction.split("\n")
+        prediction_str = " ".join(prediction)
+        hit = eval_hit(prediction_str, answer)
+        hit_list.append(hit)
+
+        em, f1, prec, recall = update_answer(prediction, answer)
+        em_list.append(em)
+        f1_list.append(f1)
+        precission_list.append(prec)
+        recall_list.append(recall)
+
+    hit = sum(hit_list) * 100 / len(hit_list)
+    f1 = sum(f1_list) * 100 / len(f1_list)
+    pre = sum(precission_list) * 100 / len(precission_list)
+    recall = sum(recall_list) * 100 / len(recall_list)
+    em = sum(em_list) * 100 / len(em_list)
+
+    print(f"Hit: {hit:.4f}")
+    print(f"Precision: {pre:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1: {f1:.4f}")
+    print(f"EM: {em:.4f}")
 
     return hit
 

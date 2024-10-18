@@ -120,13 +120,30 @@ def test_qa(query_paras, args):
 
     qa_df.to_csv(save_file_qa, index=False)
 
-    acc = get_accuracy_webqsp_qa(save_file_qa)
-    print(f"Test Acc {acc}")
+    # 2. Evaluation
+    eval_inference(save_file_qa, args)
 
-    print("Test Acc Raw Result")
-    acc_raw = get_accuracy_webqsp_qa(save_file_qa, pred_col="raw_result")
-    print(f"Test Acc Raw {acc_raw}")
+
+def eval_inference(prediction_path, args):
+    if args.eval_mode == "KGQA":
+        acc = get_accuracy_webqsp_qa(prediction_path)
+        print(f"Test Hit {acc}")
+        
+        print("-" * 30)
+        print("Test Raw Result")
+        acc_raw = get_accuracy_webqsp_qa(prediction_path, pred_col="raw_result")
+        print(f"Test Hit Raw {acc_raw}")
+    elif args.eval_mode == "DocQA":
+        hit = get_accuracy_doc_qa(prediction_path)
+        print(f"Test Hit {hit}")
+        
+        print("-" * 30)
+        print("Test Raw Result")
+        arr_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
+        print(f"Test Hit Raw {arr_raw}")
+    
     wandb.log({'Test Acc': acc_raw})
+
 
 
 def process_retrieval(
