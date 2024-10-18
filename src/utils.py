@@ -724,11 +724,11 @@ def create_inference_arg_parser():
 
     # dataset info
     parser.add_argument(
-        "--dataset_path",
+        "--dataset_name",
         type=str,
         # required=True,
-        default="/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
-        help="dataset path for index",
+        default="webq",
+        help="Dataset name for evaluation",
     )
 
     parser.add_argument(

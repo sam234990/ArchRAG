@@ -48,15 +48,17 @@ def process_question(
 
 
 def test_qa(query_paras, args):
-    
-    # TODO: change the name and project
-    wandb.init(project=f"{args.project}",
-               name=f"{args.dataset}_{args.model_name}",
-               config=args)
-    
+
+    wandb.init(
+        project=f"{args.project}",
+        name=f"{args.dataset_name}_hcarag_{query_paras['generate_strategy']}",
+        config=args,
+    )
+
     # 1. load dataset and index
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
-    qa_df = load_datasets(args.dataset_path)
+    dataset_path = dataset_path[args.datset_name]
+    qa_df = load_datasets(dataset_path)
 
     # 重置索引，确保连续性
     qa_df.reset_index(drop=True, inplace=True)
@@ -128,7 +130,7 @@ def eval_inference(prediction_path, args):
     if args.eval_mode == "KGQA":
         acc = get_accuracy_webqsp_qa(prediction_path)
         print(f"Test Hit {acc}")
-        
+
         print("-" * 30)
         print("Test Raw Result")
         acc_raw = get_accuracy_webqsp_qa(prediction_path, pred_col="raw_result")
@@ -136,14 +138,13 @@ def eval_inference(prediction_path, args):
     elif args.eval_mode == "DocQA":
         hit = get_accuracy_doc_qa(prediction_path)
         print(f"Test Hit {hit}")
-        
+
         print("-" * 30)
         print("Test Raw Result")
         arr_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
         print(f"Test Hit Raw {arr_raw}")
-    
-    wandb.log({'Test Acc': acc_raw})
 
+    wandb.log({"Test Acc": acc_raw})
 
 
 def process_retrieval(
@@ -285,7 +286,7 @@ if __name__ == "__main__":
 
     query_paras = {
         "strategy": args.strategy,
-        "only_entity":args.only_entity,
+        "only_entity": args.only_entity,
         "k_each_level": args.k_each_level,
         "k_final": args.k_final,
         "topk_e": args.topk_e,

@@ -13,7 +13,9 @@ num_workers=24
 
 output_dir="/mnt/data/wangshu/hcarag/mintaka/hcarag/hc_index_8b"
 base_path="/mnt/data/wangshu/hcarag/mintaka/KG"
-dataset_path="/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json"
+
+dataset_name="mintaka"
+# dataset_path="/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json"
 
 log_file="./eval/evaluate_t${temperature}_${strategy}_${k_each_level}_${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_${response_type}.log"
 # log_file="./eval/test_t${temperature}_${strategy}_${k_each_level}_${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_${response_type}.log"
@@ -25,7 +27,7 @@ export PYTHONPATH="/home/wangshu/rag/hier_graph_rag/:$PYTHONPATH"
 nohup python -u $python_file --strategy $strategy --k_each_level $k_each_level \
     --k_final $k_final --all_k_inference $all_k_inference --topk_e $topk_e \
     --generate_strategy $generate_strategy --response_type $response_type \
-    --output_dir $output_dir --base_path $base_path --dataset_path $dataset_path \
+    --output_dir $output_dir --base_path $base_path --dataset_name $dataset_name \
     --temperature $temperature \
     --only_entity $only_entity --num_workers $num_workers \
     >$log_file 2>&1 &

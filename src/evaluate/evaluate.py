@@ -232,6 +232,15 @@ eval_funcs = {
     "webqsp_baseline": get_accuracy_webqsp_qa,
 }
 
+dataset_path = {
+    "webq":"/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
+    "mintaka":"/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
+    "multihop":"/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
+    "hotpotqa":""
+}
+
+
+
 if __name__ == "__main__":
     save_file_qa = (
         "/mnt/data/wangshu/hcarag/FB15k/hc_index_8b/qa/global_5_10_15_direct_QA_.json"
