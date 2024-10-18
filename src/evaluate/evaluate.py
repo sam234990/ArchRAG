@@ -173,15 +173,15 @@ def f1_score(prediction, ground_truth):
     return f1, precision, recall
 
 
-def exact_match_score(prediction, ground_truth):
-    bool1 = normalize_answer(prediction) == normalize_answer(ground_truth)
-    bool2 = normalize(prediction) == normalize(ground_truth)
+def exact_match_score(prediction_str, ground_truth_str):
+    bool1 = normalize_answer(prediction_str) == normalize_answer(ground_truth_str)
+    bool2 = normalize(prediction_str) == normalize(ground_truth_str)
     return 1 if bool1 or bool2 else 0
 
 
-def update_answer(prediction, answer):
-    em = exact_match_score(prediction, answer)
-    f1, precision, recall = f1_score(prediction, answer)
+def update_answer(prediction_str, answer_str):
+    em = exact_match_score(prediction_str, answer_str)
+    f1, precision, recall = f1_score(prediction_str, answer_str)
     return em, f1, precision, recall
 
 
@@ -202,8 +202,9 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
         prediction_str = " ".join(prediction)
         hit = eval_hit(prediction_str, answer)
         hit_list.append(hit)
-
-        em, f1, prec, recall = update_answer(prediction, answer)
+        
+        answer_str = " ".join(answer)
+        em, f1, prec, recall = update_answer(prediction_str, answer_str)
         em_list.append(em)
         f1_list.append(f1)
         precission_list.append(prec)
@@ -232,11 +233,11 @@ eval_funcs = {
     "webqsp_baseline": get_accuracy_webqsp_qa,
 }
 
-dataset_path = {
+dataset_name_path = {
     "webq":"/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
     "mintaka":"/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
     "multihop":"/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
-    "hotpotqa":""
+    "hotpot":"/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json"
 }
 
 

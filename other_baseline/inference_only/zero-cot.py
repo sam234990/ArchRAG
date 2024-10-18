@@ -4,10 +4,14 @@ import os
 # 添加 src 文件夹到 sys.path
 src_path = "/home/wangshu/rag/hier_graph_rag"
 sys.path.append(os.path.abspath(src_path))
-os.environ["WANDB_MODE"] = "offline"
+# os.environ["WANDB_MODE"] = "offline"
+# 设置代理
+os.environ["http_proxy"] = "http://127.0.0.1:7892"
+os.environ["https_proxy"] = "http://127.0.0.1:7892"
+
 
 from src.llm import llm_invoker
-from src.evaluate.evaluate import get_accuracy_webqsp_qa
+from src.evaluate.evaluate import *
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -39,9 +43,11 @@ def run_zero_cot_llm(
     dataset: pd.DataFrame, strategy, save_dir, args=None, num_workers=12
 ):
     print(f"Running {strategy} strategy")
-    
+
     wandb.init(
-        project=f"{args.project}", name=f"{args.dataset_name}_{args.strategy}", config=args
+        project=f"{args.project}",
+        name=f"{args.dataset_name}_{args.strategy}",
+        config=args,
     )
 
     if strategy == "zero-shot":
@@ -72,11 +78,18 @@ def run_zero_cot_llm(
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"{strategy}.csv")
     results_df.to_csv(save_path, index=False)
+    eval_res(save_path=save_path, eval_mode=args.eval_mode)
 
-    acc = get_accuracy_webqsp_qa(save_path)
-    print(f"Test Acc : {acc}")
-    wandb.log({"Test Acc": acc})
-    
+
+def eval_res(save_path, eval_mode):
+    if eval_mode == "KGQA":
+        hit = get_accuracy_webqsp_qa(save_path)
+        print(f"Test Hit : {hit}")
+    elif eval_mode == "DocQA":
+        hit = get_accuracy_doc_qa(save_path)
+        print(f"Test Hit : {hit}")
+
+    wandb.log({"Test Hit": hit})
 
 
 class Args:
@@ -89,14 +102,11 @@ class Args:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    dataset_path_dict = {
-        "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
-        "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
-    }
-
     save_path_dict = {
         "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/baseline",
         "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
+        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
     }
 
     parser.add_argument("--project", type=str, default="hcarag")
@@ -104,9 +114,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        choices=dataset_path_dict.keys(),  # 只允许选择这两个数据集
+        choices=dataset_name_path.keys(),  # 只允许选择这两个数据集
         default="mintaka",
-        help=f"Select the dataset name. Options are: {' '.join(dataset_path_dict.keys())}",
+        help=f"Select the dataset name. Options are: {' '.join(dataset_name_path.keys())}",
     )
 
     parser.add_argument(
@@ -115,10 +125,18 @@ if __name__ == "__main__":
         default="zero-shot",
     )
 
+    parser.add_argument(
+        "--eval_mode",
+        type=str,
+        choices=["KGQA", "DocQA"],
+        default="KGQA",
+        help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
+    )
+
     args = parser.parse_args()
 
     strategy = args.strategy
-    dataset_path = dataset_path_dict[args.dataset_name]
+    dataset_path = dataset_name_path[args.dataset_name]
     save_dir = save_path_dict[args.dataset_name]
 
     # Read dataset

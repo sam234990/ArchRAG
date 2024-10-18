@@ -3,6 +3,12 @@ import multiprocessing as mp
 from functools import partial
 import logging
 import wandb
+import os
+import time
+
+# 设置代理
+os.environ["http_proxy"] = "http://127.0.0.1:7892"
+os.environ["https_proxy"] = "http://127.0.0.1:7892"
 
 from src.inference import *
 from src.utils import create_inference_arg_parser
@@ -57,7 +63,7 @@ def test_qa(query_paras, args):
 
     # 1. load dataset and index
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
-    dataset_path = dataset_path[args.datset_name]
+    dataset_path = dataset_name_path[args.dataset_name]
     qa_df = load_datasets(dataset_path)
 
     # 重置索引，确保连续性
@@ -88,6 +94,8 @@ def test_qa(query_paras, args):
     print(f"Number of questions: {len(qa_df)}")
     print(f"Number of questions per process: {len(qa_df) / number_works}")
 
+    start_time = time.time()
+    
     # 创建进程池
     with mp.Pool(processes=number_works) as pool:
         # 准备每个问题的输入参数
@@ -117,6 +125,8 @@ def test_qa(query_paras, args):
             qa_df.loc[idx, "raw_result"] = "None"
             qa_df.loc[idx, "pred"] = "None"
 
+    print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
+    
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
     qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 

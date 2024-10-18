@@ -32,9 +32,9 @@ HCHNSW::HCHNSW(int ML, int M, int CL, int VS) : rng(12345) {
     }
 
     // reserve space for some variable for the vectors
-    if (VS <= 0) {
-        std::cerr << "Error: vector_size should be greater than 0" << std::endl;
-    }
+    // if (VS <= 0) {
+    //     std::cerr << "Error: vector_size should be greater than 0" << std::endl;
+    // }
     vector_size = VS;
     levels.reserve(VS + 1);
     offsets.reserve(VS + 1);
