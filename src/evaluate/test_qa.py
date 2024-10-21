@@ -95,7 +95,7 @@ def test_qa(query_paras, args):
     print(f"Number of questions per process: {len(qa_df) / number_works}")
 
     start_time = time.time()
-    
+
     # 创建进程池
     with mp.Pool(processes=number_works) as pool:
         # 准备每个问题的输入参数
@@ -126,9 +126,17 @@ def test_qa(query_paras, args):
             qa_df.loc[idx, "pred"] = "None"
 
     print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
-    
+
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
-    qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
+
+    def process_gb_answer(x):
+        if isinstance(x, list):
+            return "|".join(map(str, x))
+        elif isinstance(x, str):
+            return x
+
+    qa_df["label"] = qa_df["answers"].apply(process_gb_answer)
+    # qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
 
     qa_df.to_csv(save_file_qa, index=False)
 
@@ -151,8 +159,8 @@ def eval_inference(prediction_path, args):
 
         print("-" * 30)
         print("Test Raw Result")
-        arr_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
-        print(f"Test Hit Raw {arr_raw}")
+        acc_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
+        print(f"Test Hit Raw {acc_raw}")
 
     wandb.log({"Test Acc": acc_raw})
 

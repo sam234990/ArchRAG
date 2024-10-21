@@ -22,12 +22,13 @@ def llm_invoker(
 
     engine = args.engine
     client = OpenAI(api_key=api_key, base_url=base_url)
-    messages = [
-        {
-            "role": "system",
-            "content": "You are an AI assistant that helps people find information.",
-        }
-    ]
+    # messages = [
+    #     {
+    #         "role": "system",
+    #         "content": "You are an AI assistant that helps people find information.",
+    #     }
+    # ]
+    messages = []
     message_prompt = {"role": "user", "content": input_text}
     messages.append(message_prompt)
     # 准备用于传递给 API 的参数字典

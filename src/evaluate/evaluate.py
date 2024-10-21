@@ -202,7 +202,7 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
         prediction_str = " ".join(prediction)
         hit = eval_hit(prediction_str, answer)
         hit_list.append(hit)
-        
+
         answer_str = " ".join(answer)
         em, f1, prec, recall = update_answer(prediction_str, answer_str)
         em_list.append(em)
@@ -234,12 +234,18 @@ eval_funcs = {
 }
 
 dataset_name_path = {
-    "webq":"/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
-    "mintaka":"/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
-    "multihop":"/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
-    "hotpot":"/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json"
+    "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
+    "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
+    "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
+    "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
 }
 
+baseline_save_path_dict = {
+    "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/baseline",
+    "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
+    "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
+    "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
+}
 
 
 if __name__ == "__main__":

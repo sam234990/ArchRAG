@@ -4,7 +4,7 @@ import gc
 from tqdm import tqdm
 import pandas as pd
 from src.config import parse_args_llama
-from src.dataset import load_dataset
+from src.dataset import load_dataset, dataset_output_dir
 from src.utils.evaluate import get_accuracy_webqsp
 import multiprocessing as mp
 from torch.utils.data import Subset
@@ -68,7 +68,7 @@ def process_worker(dataset_part, llm_invoker_args):
 
 
 def main(args):
-    dataset_name = "webqsp"
+    dataset_name = args.dataset
     dataset = load_dataset[dataset_name]()
     # Step 2: 并行处理设置
     num_workers = 20  # 设定并行的进程数量
@@ -103,8 +103,8 @@ def main(args):
     all_results_df = pd.DataFrame(all_results)
 
     # Step 4. Evaluating
-    # output_dir = "/mnt/data/wangshu/hcarag/FB15k/KG"
-    output_dir = "/mnt/data/wangshu/hcarag/mintaka/KG"
+    # output_dir = 
+    output_dir = dataset_output_dir[dataset_name]
     os.makedirs(f"{output_dir}/{dataset_name}", exist_ok=True)
     path = f"{output_dir}/{dataset_name}/model_name_.csv"
     print(f"path: {path}")

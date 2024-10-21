@@ -17,6 +17,7 @@ def hcarag(
     level_summary_df,
     relation_df,
     query_paras,
+    graph,
     args,
 ):
 
@@ -28,6 +29,7 @@ def hcarag(
         level_summary_df=level_summary_df,
         relation_df=relation_df,
         query_paras=query_paras,
+        graph=graph,
         args=args,
     )
 
@@ -65,6 +67,7 @@ def hcarag_retrieval(
     level_summary_df,
     relation_df,
     query_paras,
+    graph,
     args,
 ):
     query_paras["query_content"] = query_content
@@ -147,7 +150,46 @@ def hcarag_retrieval(
             query_embedding, sel_r_df, topk=query_paras["topk_e"]
         )
 
-    return topk_entity, topk_community, topk_related_r
+    # 从 topk_entity 获取 ppr 所需的 personalization 信息
+    siz = len(topk_entity["human_readable_id"])
+    personalization = {id: 1.0 / siz for id in topk_entity["human_readable_id"]}
+
+    # 调用 nx 库 pagerank 方法，获得图的 pagerank 字典
+    pagerank = nx.pagerank(graph, personalization=personalization)
+
+    # 从 pagerank 字典中找到 rank 前 ppr_topk 的元素，将其id加入 ppr_topk_id
+    ppr_topk = query_paras["k_final"]
+    ppr_topk_id = [
+        id
+        for id, value in sorted(
+            pagerank.items(), key=lambda item: item[1], reverse=True
+        )[:ppr_topk]
+    ]
+
+    # 提取最终的预测值（实体索引）
+    ppr_final_predictions = [
+        id
+        for id in entity_df[entity_df["human_readable_id"].isin(ppr_topk_id)].index_id
+    ]
+
+    # 用于存储 ppr top-k 的实体和社区
+    ppr_topk_entity = entity_df[entity_df["index_id"].isin(ppr_final_predictions)]
+    ppr_topk_community = community_df[
+        community_df["index_id"].isin(ppr_final_predictions)
+    ]
+
+    ppr_sel_r_df = relation_df[
+        relation_df["source_index_id"].isin(ppr_final_predictions)
+    ].copy()
+    if len(sel_r_df) == 0:
+        ppr_topk_related_r = pd.DataFrame(columns=relation_df.columns)
+    else:
+        ppr_topk_related_r = get_topk_related_r(
+            query_embedding, ppr_sel_r_df, topk=query_paras["topk_e"]
+        )
+
+    return ppr_topk_entity, ppr_topk_community, ppr_topk_related_r
+    # return topk_entity, topk_community, topk_related_r
 
 
 def hcarag_inference(
@@ -312,7 +354,7 @@ def calculate_k_per_level(level_weight, all_k):
 def load_index(args):
 
     hc_index = read_index(args.output_dir, "hchnsw.index")
- 
+
     entity_path = os.path.join(args.output_dir, "entity_df_index.csv")
     entity_df = pd.read_csv(entity_path)
 
@@ -345,6 +387,13 @@ def load_index(args):
 if __name__ == "__main__":
     parser = create_inference_arg_parser()
     args = parser.parse_args()
+
+    graph, entities_df, final_relationships = read_graph_nx(
+        file_path=args.base_path,
+        entity_filename=args.entity_filename,
+        relationship_filename=args.relationship_filename,
+    )
+
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
     # test_question = "What is the usage and value of TLB in an Operating System?"
     test_question = "what does jamaican people speak?"
@@ -372,6 +421,7 @@ if __name__ == "__main__":
         level_summary_df,
         relation_df,
         query_paras,
+        graph,
         args,
     )
     print(response["raw_result"])

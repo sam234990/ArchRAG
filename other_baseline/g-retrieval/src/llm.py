@@ -19,12 +19,13 @@ def llm_invoker(
 
     engine = args.engine
     client = OpenAI(api_key=api_key, base_url=base_url)
-    messages = [
-        {
-            "role": "system",
-            "content": "You are an AI assistant that helps people find information.",
-        }
-    ]
+    # messages = [
+    #     {
+    #         "role": "system",
+    #         "content": "You are an AI assistant that helps people find information.",
+    #     }
+    # ]
+    messages = []
     message_prompt = {"role": "user", "content": input_text}
     messages.append(message_prompt)
     # 准备用于传递给 API 的参数字典
@@ -41,7 +42,6 @@ def llm_invoker(
     if json:
         parameters["response_format"] = {"type": "json_object"}
 
-    print("start openai")
     retries = 0
     success = False
     result = None
@@ -61,7 +61,6 @@ def llm_invoker(
         # 可以抛出异常或返回 None
         raise Exception("Failed to get a response from OpenAI after multiple retries.")
 
-    print("end openai")
     return result
 
 

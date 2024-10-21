@@ -6,7 +6,7 @@
 import argparse
 from enum import Enum
 
-from .cli import doc_qa_global_search, run_local_search
+from .cli import run_global_search, run_local_search, docqa_global_search
 
 INVALID_METHOD_ERROR = "Invalid method"
 
@@ -16,6 +16,7 @@ class SearchType(Enum):
 
     LOCAL = "local"
     GLOBAL = "global"
+    DOCQA = "docqa"
 
     def __str__(self):
         """Return the string representation of the enum value."""
@@ -73,10 +74,24 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "query",
-        nargs=1,
-        help="The query to run",
+        "--query",
         type=str,
+        help="The query to run",
+        default=["None"],
+    )
+
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        help="The dataset name",
+        default="None",
+    )
+
+    parser.add_argument(
+        "--max_concurrent",
+        type=int,
+        help="The maximum number of concurrent tasks to run",
+        default=12,
     )
 
     args = parser.parse_args()
@@ -92,13 +107,23 @@ if __name__ == "__main__":
                 args.query[0],
             )
         case SearchType.GLOBAL:
-            doc_qa_global_search(
+            run_global_search(
                 args.config,
                 args.data,
                 args.root,
                 args.community_level,
                 args.response_type,
                 args.query[0],
+            )
+        case SearchType.DOCQA:
+            docqa_global_search(
+                args.config,
+                args.data,
+                args.root,
+                args.community_level,
+                args.response_type,
+                args.dataset_name,
+                args.max_concurrent,
             )
         case _:
             raise ValueError(INVALID_METHOD_ERROR)

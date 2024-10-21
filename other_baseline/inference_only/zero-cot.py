@@ -102,13 +102,6 @@ class Args:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    save_path_dict = {
-        "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/baseline",
-        "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
-        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
-        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
-    }
-
     parser.add_argument("--project", type=str, default="hcarag")
 
     parser.add_argument(
@@ -137,7 +130,7 @@ if __name__ == "__main__":
 
     strategy = args.strategy
     dataset_path = dataset_name_path[args.dataset_name]
-    save_dir = save_path_dict[args.dataset_name]
+    save_dir = baseline_save_path_dict[args.dataset_name]
 
     # Read dataset
     dataset = pd.read_json(dataset_path, lines=True, orient="records")

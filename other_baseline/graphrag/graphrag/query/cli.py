@@ -18,10 +18,21 @@ from graphrag.index.progress import PrintProgressReporter
 
 from . import api
 
+import sys
+
+src_path = "/home/wangshu/rag/hier_graph_rag"
+sys.path.append(os.path.abspath(src_path))
+from src.evaluate.evaluate import (
+    get_accuracy_doc_qa,
+    dataset_name_path,
+    baseline_save_path_dict,
+)
+
+
 reporter = PrintProgressReporter("")
 
 
-def doc_qa_global_search(
+def run_global_search(
     config_dir: str | None,
     data_dir: str | None,
     root_dir: str | None,
@@ -61,13 +72,14 @@ def doc_qa_global_search(
     )
 
 
-def doc_qa_global_search(
+def docqa_global_search(
     config_dir: str | None,
     data_dir: str | None,
     root_dir: str | None,
     community_level: int,
     response_type: str,
-    dataset_path: str,
+    dataset_name: str,
+    max_concurrent_tasks: int,
 ):
     """Perform a global search with a given query.
 
@@ -88,10 +100,51 @@ def doc_qa_global_search(
         data_path / "create_final_community_reports.parquet"
     )
     
+    dataset_path = dataset_name_path[dataset_name]
     
+    print(f"Dataset Path : {dataset_path}")
+    
+    dataset = pd.read_json(dataset_path, orient="records", lines=True)
+    dataset.rename(columns={"answers": "label"}, inplace=True)
+    dataset["id"] = range(len(dataset))
+    print(f"Dataset Shape : {dataset.shape}")
 
-    return asyncio.run(
-        api.global_search(
+    save_dir = baseline_save_path_dict[dataset_name]
+    save_path = os.path.join(save_dir, f"graphrag.csv")
+
+
+    updated_dataset = asyncio.run(
+        process_dataset_queries(
+            dataset=dataset,
+            config=config,
+            final_nodes=final_nodes,
+            final_entities=final_entities,
+            final_community_reports=final_community_reports,
+            community_level=community_level,
+            response_type=response_type,
+            max_concurrent_tasks=max_concurrent_tasks,
+        )
+    )
+
+    updated_dataset.to_csv(save_path, index=False)
+
+    hit = get_accuracy_doc_qa(save_path)
+    print(f"Test Hit : {hit}")
+    return 
+
+
+async def limited_search(
+    query,
+    config,
+    final_nodes,
+    final_entities,
+    final_community_reports,
+    community_level,
+    response_type,
+    semaphore,
+):
+    async with semaphore:
+        return await api.global_search(
             config=config,
             nodes=final_nodes,
             entities=final_entities,
@@ -100,7 +153,42 @@ def doc_qa_global_search(
             response_type=response_type,
             query=query,
         )
-    )
+
+
+async def process_dataset_queries(
+    dataset,
+    config,
+    final_nodes,
+    final_entities,
+    final_community_reports,
+    community_level,
+    response_type,
+    max_concurrent_tasks=5,
+):
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+    tasks = []
+
+    # 提取 DataFrame 中的 question 列，创建查询任务
+    for query in dataset["question"]:
+        task = limited_search(
+            query,
+            config,
+            final_nodes,
+            final_entities,
+            final_community_reports,
+            community_level,
+            response_type,
+            semaphore,
+        )
+        tasks.append(task)
+
+    # 并发执行所有任务，并返回结果
+    results = await asyncio.gather(*tasks)
+
+    # 将结果写入 DataFrame 的新列 'pred'
+    dataset["pred"] = results
+
+    return dataset
 
 
 def run_local_search(
