@@ -129,15 +129,6 @@ def test_qa(query_paras, args):
 
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
 
-    def process_gb_answer(x):
-        if isinstance(x, list):
-            return "|".join(map(str, x))
-        elif isinstance(x, str):
-            return x
-
-    qa_df["label"] = qa_df["answers"].apply(process_gb_answer)
-    # qa_df["label"] = qa_df["answers"].apply(lambda x: "|".join(map(str, x)))
-
     qa_df.to_csv(save_file_qa, index=False)
 
     # 2. Evaluation

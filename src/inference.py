@@ -174,10 +174,6 @@ def hcarag_retrieval(
 
     # 用于存储 ppr top-k 的实体和社区
     ppr_topk_entity = entity_df[entity_df["index_id"].isin(ppr_final_predictions)]
-    ppr_topk_community = community_df[
-        community_df["index_id"].isin(ppr_final_predictions)
-    ]
-
     ppr_sel_r_df = relation_df[
         relation_df["source_index_id"].isin(ppr_final_predictions)
     ].copy()
@@ -188,7 +184,7 @@ def hcarag_retrieval(
             query_embedding, ppr_sel_r_df, topk=query_paras["topk_e"]
         )
 
-    return ppr_topk_entity, ppr_topk_community, ppr_topk_related_r
+    return ppr_topk_entity, topk_community, ppr_topk_related_r
     # return topk_entity, topk_community, topk_related_r
 
 
@@ -405,10 +401,12 @@ if __name__ == "__main__":
     # }
     query_paras = {
         "strategy": "global",
+        "only_entity": args.only_entity,
         "k_each_level": 5,
         "k_final": 10,
         "topk_e": args.topk_e,
         "all_k_inference": 15,
+        "ppr_refine":args.ppr_refine,
         "generate_strategy": "mr",
         # "generate_strategy": "direct",
         "response_type": "QA",

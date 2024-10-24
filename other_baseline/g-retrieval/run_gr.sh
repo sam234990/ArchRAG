@@ -1,4 +1,4 @@
-temperature=0.1
+temperature=0.7
 # dataset="webq"
 dataset="mintaka"
 

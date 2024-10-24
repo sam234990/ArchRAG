@@ -42,6 +42,8 @@ def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_a
 def run_zero_cot_llm(
     dataset: pd.DataFrame, strategy, save_dir, args=None, num_workers=12
 ):
+    if args.debug_flag:
+        dataset = dataset.iloc[:100]
     print(f"Running {strategy} strategy")
 
     wandb.init(
@@ -77,6 +79,9 @@ def run_zero_cot_llm(
 
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"{strategy}.csv")
+
+    print(f"Saving results to {save_path}")
+
     results_df.to_csv(save_path, index=False)
     eval_res(save_path=save_path, eval_mode=args.eval_mode)
 
@@ -125,6 +130,20 @@ if __name__ == "__main__":
         default="KGQA",
         help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
     )
+    
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=28,
+        help="Number of workers for multiprocessing",
+    )
+
+    parser.add_argument(
+        "--debug_flag",
+        type=lambda x: x.lower() == "true",
+        default=False,
+        help="Debug flag for testing",
+    )
 
     args = parser.parse_args()
 
@@ -134,7 +153,7 @@ if __name__ == "__main__":
 
     # Read dataset
     dataset = pd.read_json(dataset_path, lines=True, orient="records")
-    dataset.rename(columns={"answers": "label"}, inplace=True)
+    # dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
 
     run_zero_cot_llm(dataset, strategy, save_dir=save_dir, args=args)

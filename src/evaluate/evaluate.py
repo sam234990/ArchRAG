@@ -137,6 +137,7 @@ def normalize_answer(s):
     def remove_punc(text):
         exclude = set(string.punctuation)
         return "".join(ch for ch in text if ch not in exclude)
+        # return re.sub(f"[{re.escape(string.punctuation)}]", " ", text)
 
     def lower(text):
         return text.lower()
@@ -198,12 +199,19 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
     label_list, pred_list = get_label_pred_list(df, pred_col, label_col)
     for prediction, answer in zip(pred_list, label_list):
 
+        prediction = prediction.replace("|", "\n")
         prediction = prediction.split("\n")
         prediction_str = " ".join(prediction)
+        
+        answer = answer.split("|")
+        if isinstance(answer, list):      
+            answer_str = " ".join(answer)
+        else:
+            answer_str = answer
+        
         hit = eval_hit(prediction_str, answer)
         hit_list.append(hit)
 
-        answer_str = " ".join(answer)
         em, f1, prec, recall = update_answer(prediction_str, answer_str)
         em_list.append(em)
         f1_list.append(f1)
@@ -238,6 +246,7 @@ dataset_name_path = {
     "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
+    "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa.json",
 }
 
 baseline_save_path_dict = {
@@ -245,6 +254,7 @@ baseline_save_path_dict = {
     "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
+    "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
 }
 
 

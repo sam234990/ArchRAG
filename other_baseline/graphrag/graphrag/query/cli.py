@@ -19,6 +19,7 @@ from graphrag.index.progress import PrintProgressReporter
 from . import api
 
 import sys
+import time
 
 src_path = "/home/wangshu/rag/hier_graph_rag"
 sys.path.append(os.path.abspath(src_path))
@@ -85,6 +86,10 @@ def docqa_global_search(
 
     Loads index files required for global search and calls the Query API.
     """
+    import warnings
+    warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
+
+    
     data_dir, root_dir, config = _configure_paths_and_settings(
         data_dir, root_dir, config_dir
     )
@@ -112,7 +117,8 @@ def docqa_global_search(
     save_dir = baseline_save_path_dict[dataset_name]
     save_path = os.path.join(save_dir, f"graphrag.csv")
 
-
+    start_time = time.time()
+    
     updated_dataset = asyncio.run(
         process_dataset_queries(
             dataset=dataset,
@@ -126,6 +132,8 @@ def docqa_global_search(
         )
     )
 
+    print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
+    
     updated_dataset.to_csv(save_path, index=False)
 
     hit = get_accuracy_doc_qa(save_path)
