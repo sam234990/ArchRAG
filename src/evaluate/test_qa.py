@@ -19,6 +19,7 @@ def load_datasets(datasets_path) -> pd.DataFrame:
     qa_df = pd.read_json(datasets_path, orient="records", lines=True)
     print("test datasets size:")
     print(qa_df.shape)
+    qa_df["id"] = range(len(qa_df))
     return qa_df
 
 
@@ -31,6 +32,7 @@ def process_question(
     level_summary_df,
     relation_df,
     query_paras,
+    graph,
     args,
 ):
     question = row["question"]
@@ -45,6 +47,7 @@ def process_question(
             level_summary_df=level_summary_df,
             relation_df=relation_df,
             query_paras=query_paras,
+            graph=graph,
             args=args,
         )
         return idx, response_report
@@ -63,6 +66,13 @@ def test_qa(query_paras, args):
 
     # 1. load dataset and index
     hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
+
+    graph, _, _ = read_graph_nx(
+        file_path=args.base_path,
+        entity_filename=args.entity_filename,
+        relationship_filename=args.relationship_filename,
+    )
+
     dataset_path = dataset_name_path[args.dataset_name]
     qa_df = load_datasets(dataset_path)
 
@@ -107,6 +117,7 @@ def test_qa(query_paras, args):
             level_summary_df=level_summary_df,
             relation_df=relation_df,
             query_paras=query_paras,
+            graph=graph,
             args=args,
         )
 
@@ -300,6 +311,7 @@ if __name__ == "__main__":
         "k_final": args.k_final,
         "topk_e": args.topk_e,
         "all_k_inference": args.all_k_inference,
+        "ppr_refine": args.ppr_refine,
         "generate_strategy": args.generate_strategy,
         "response_type": args.response_type,
     }

@@ -38,12 +38,11 @@ class MintakaDataset(Dataset):
         data = self.dataset.iloc[index]
         question = f'Question: {data["question"]}\nAnswer: '
         desc = open(f"{cached_desc}/{index}.txt", "r").read()
-        label = ("|").join(data["answers"]).lower()
-
+            
         return {
             "id": index,
             "question": question,
-            "label": label,
+            "label": data["label"].lower(),
             "desc": desc,
         }
 
@@ -158,12 +157,12 @@ def read_graph():
 
 
 if __name__ == "__main__":
-    # entity_df, relation_df, relation_embedding, dataset = read_graph()
-    # preprocess(entity_df, relation_df, relation_embedding, dataset, num_workers=32)
+    entity_df, relation_df, relation_embedding, dataset = read_graph()
+    preprocess(entity_df, relation_df, relation_embedding, dataset, num_workers=32)
 
     dataset = MintakaDataset()
     print(len(dataset))
-    data = dataset[1]
+    data = dataset[20]
     for k, v in data.items():
         print(f"{k}: {v}")
 

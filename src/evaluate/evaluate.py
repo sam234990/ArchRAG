@@ -117,7 +117,16 @@ def get_accuracy_webqsp_qa(path, pred_col="pred", label_col="label"):
     f1 = sum(f1_list) * 100 / len(f1_list)
     pre = sum(precission_list) * 100 / len(precission_list)
     recall = sum(recall_list) * 100 / len(recall_list)
-
+    
+    if pred_col != "pred":
+        df['acc'] = acc_list
+        df['hit'] = hit_list  
+        df['f1'] = f1_list
+        df['precision'] = precission_list
+        df['recall'] = recall_list
+        
+        df.to_csv(path, index=False)
+    
     print(f"Accuracy: {acc:.4f}")
     print(f"Hit: {hit:.4f}")
     print(f"Precision: {pre:.4f}")

@@ -48,7 +48,7 @@ def run_zero_cot_llm(
 
     wandb.init(
         project=f"{args.project}",
-        name=f"{args.dataset_name}_{args.strategy}",
+        name=f"{args.dataset_name}_{args.strategy}_{args.engine}",
         config=args,
     )
 
@@ -63,6 +63,8 @@ def run_zero_cot_llm(
     print(f"subset size: {len(dataset_parts[0])}")
 
     llm_args = Args()
+    llm_args.engine = args.engine
+    print(f"llm engine: {llm_args.engine}")
 
     with mp.Pool(processes=num_workers) as pool:
         results = pool.starmap(
@@ -78,7 +80,7 @@ def run_zero_cot_llm(
     results_df = pd.DataFrame(flattened_results)
 
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{strategy}.csv")
+    save_path = os.path.join(save_dir, f"{strategy}_{args.engine}.csv")
 
     print(f"Saving results to {save_path}")
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
         default="KGQA",
         help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
     )
-    
+
     parser.add_argument(
         "--num_workers",
         type=int,
@@ -143,6 +145,13 @@ if __name__ == "__main__":
         type=lambda x: x.lower() == "true",
         default=False,
         help="Debug flag for testing",
+    )
+
+    parser.add_argument(
+        "--engine",
+        type=str,
+        default="llama3.1:8b4k",
+        help="Engine name for LLM",
     )
 
     args = parser.parse_args()

@@ -58,7 +58,7 @@ def process_worker(dataset_part, llm_invoker_args):
             "id": data["id"],
             "question": data["question"],
             "label": data["label"],
-            "pred": llm_res,
+            "pred": llm_res.lower(),
         }
         results.append(tmp_res)
         if i % (len(dataset_part) / 3) == 0:
@@ -106,7 +106,7 @@ def main(args):
     # output_dir = 
     output_dir = dataset_output_dir[dataset_name]
     os.makedirs(f"{output_dir}/{dataset_name}", exist_ok=True)
-    path = f"{output_dir}/{dataset_name}/model_name_.csv"
+    path = f"{output_dir}/{dataset_name}/model_name_{args.temperature}.csv"
     print(f"path: {path}")
 
     all_results_df.to_csv(path, index=False)

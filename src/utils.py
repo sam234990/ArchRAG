@@ -67,7 +67,8 @@ def read_graph_nx(
         graph.add_node(row["human_readable_id"])
 
     add_weight = "weight" in relationships.columns
-    for _, row in tqdm(relationships.iterrows(), total=relationships.shape[0]):
+    # for _, row in tqdm(relationships.iterrows(), total=relationships.shape[0]):
+    for _, row in relationships.iterrows():
         # graph.add_edge(row["source"], row["target"], weight=row["weight"])
         if add_weight in row:
             graph.add_edge(row["head_id"], row["tail_id"], weight=row["weight"])
