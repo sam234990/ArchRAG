@@ -3,23 +3,18 @@ k_each_level=10
 k_final=15
 topk_e=10
 all_k_inference=15
-# generate_strategy="direct"
-generate_strategy="mr"
+generate_strategy="direct"
+# generate_strategy="mr"
 response_type="QA"
 
 temperature=0.1
 only_entity=False
-ppr_refine=False
-
 num_workers=20
 
 eval_mode="DocQA"
 
 output_dir="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b"
 base_path="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag"
-
-relationship_filename="create_final_relationships.parquet"
-entity_filename="create_final_entities.parquet"
 
 dataset_name="multihop"
 
@@ -34,8 +29,7 @@ nohup python -u $python_file --strategy $strategy --k_each_level $k_each_level \
     --generate_strategy $generate_strategy --response_type $response_type \
     --temperature $temperature --eval_mode $eval_mode \
     --output_dir $output_dir --base_path $base_path --dataset_name $dataset_name \
-    --relationship_filename $relationship_filename \
-    --only_entity $only_entity --num_workers $num_workers  --ppr_refine $ppr_refine  \
+    --only_entity $only_entity --num_workers $num_workers \
     >$log_file 2>&1 &
 
 echo "log file: $log_file"

@@ -1,10 +1,10 @@
 strategy="global"
 k_each_level=10
-k_final=20
+k_final=15
 topk_e=15
 all_k_inference=15
-generate_strategy="mr"
-# generate_strategy="direct"
+# generate_strategy="mr"
+generate_strategy="direct"
 response_type="QA"
 
 temperature=0.1
