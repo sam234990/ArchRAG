@@ -193,7 +193,6 @@ def hcarag_retrieval(
         return ppr_topk_entity, topk_community, ppr_topk_related_r
 
 
-
 def hcarag_inference(
     topk_entity, topk_community, topk_related_r, query, max_retries, args, query_paras
 ):
@@ -267,15 +266,20 @@ def hcarag_inference_mr(
     query_paras,
     args,
 ):
+    llm_query_content = query + "\nLet’s think step by step. \n Answer: "
+    llm_res = llm_invoker(
+        llm_query_content, args=args, max_tokens=args.max_tokens, json=False
+    )
+
     map_res_df = map_inference(
         entity_df=topk_entity,
         community_df=topk_community,
         relation_df=topk_related_r,
+        llm_res=llm_res,
         query=query,
+        query_paras=query_paras,
         args=args,
     )
-    llm_query_content = query + "\nLet’s think step by step. \n Answer: "
-    llm_res = llm_invoker(llm_query_content, args=args, max_tokens=args.max_tokens, json=False)
     response_report = reduce_inference(map_res_df, query, args)
     return response_report
 
@@ -418,6 +422,7 @@ if __name__ == "__main__":
         "generate_strategy": "mr",
         # "generate_strategy": "direct",
         "response_type": "QA",
+        "involve_llm_res": True,
     }
     response = hcarag(
         test_question,

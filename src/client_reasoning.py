@@ -399,7 +399,7 @@ def prep_map_content(
     return all_chunks
 
 
-def map_llm_worker(content, args)->list[Dict[str, Any]]:
+def map_llm_worker(content, args) -> list[Dict[str, Any]]:
     retries = 0
     points_data = []  # List to hold the descriptions and scores
 
@@ -435,7 +435,16 @@ def map_llm_worker(content, args)->list[Dict[str, Any]]:
     return points_data
 
 
-def map_inference(entity_df, relation_df, community_df, query, args, parallel_flag=False):
+def map_inference(
+    entity_df,
+    relation_df,
+    community_df,
+    llm_res,
+    query,
+    args,
+    query_paras,
+    parallel_flag=False,
+):
     all_chunks = prep_map_content(
         entity_df=entity_df,
         relation_df=relation_df,
@@ -443,12 +452,18 @@ def map_inference(entity_df, relation_df, community_df, query, args, parallel_fl
         query=query,
         max_tokens=args.max_tokens,
     )
+    if query_paras["involve_llm_res"] is True:
+        llm_res_content = LLM_RES_PROMPT.format(llm_res=llm_res)
+        all_chunks = [
+            GLOBAL_MAP_SYSTEM_PROMPT.format(context_data=llm_res_content, user_query=query)
+        ] + all_chunks
+
     if parallel_flag == False:
         all_result = []
         for chunk in all_chunks:
             res = map_llm_worker(chunk, args)
             all_result.extend(res)
-        
+
         res_df = pd.DataFrame(all_result)
         return res_df
     else:
@@ -518,14 +533,16 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
     reduce_context = prep_reduce_content(map_res_df, max_tokens=args.max_tokens)
     response_type_content = GENERATION_RESPONSE_FORMAT[response_type]
     reduce_prompt = GLOBAL_REDUCE_SYSTEM_PROMPT.format(
-        report_data=reduce_context, user_query=query, response_format=response_type_content
+        report_data=reduce_context,
+        user_query=query,
+        response_format=response_type_content,
     )
     if reduce_context == "":
         reduce_prompt += GENERAL_KNOWLEDGE_INSTRUCTION
 
     retries = 0
     direct_answer = ""
-    raw_result=""
+    raw_result = ""
 
     while retries < args.max_retries:
         raw_result = llm_invoker(
@@ -541,23 +558,24 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
     return response_report
 
 
-def qa_response_extract(response_content:str):
+def qa_response_extract(response_content: str):
     # 定义简化的正则表达式模式
     pattern = r"Direct Answer\s*(.+?)\s*Brief Analysis"
     # 使用正则表达式匹配
     match = re.search(pattern, response_content, re.DOTALL)
-    
+
     if match:
         # 提取并返回Direct Answer部分
         direct_answer = match.group(1).strip()
         # 替换除|以外的符号为空格
-        direct_answer = re.sub(r'[^|\w\s]', ' ', direct_answer)
-        direct_answer = re.sub(r'\s+', ' ', direct_answer).strip()  # 去除多余空格
+        direct_answer = re.sub(r"[^|\w\s]", " ", direct_answer)
+        direct_answer = re.sub(r"\s+", " ", direct_answer).strip()  # 去除多余空格
         # 检查direct_answer是否为空
         if direct_answer:
             return True, direct_answer
-    
+
     return False, ""
+
 
 if __name__ == "__main__":
     parser = create_arg_parser()

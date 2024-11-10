@@ -432,7 +432,7 @@ GENERATION_RESPONSE_FORMAT = {
 Example format:
 ---Direct Answer---: <answer_1> | <answer_2> | <answer_3>
 ---Brief Analysis---: <analysis>
-"""
+""",
 }
 
 
@@ -661,6 +661,12 @@ The response should be JSON formatted as follows:
     ]
 }}
 """
+
+LLM_RES_PROMPT = """
+The following is the result obtained through LLM reasoning. Please reference any useful information from this section.
+{llm_res}
+"""
+
 
 GLOBAL_REDUCE_SYSTEM_PROMPT = """
 ---Role---
