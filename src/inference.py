@@ -274,6 +274,8 @@ def hcarag_inference_mr(
         query=query,
         args=args,
     )
+    llm_query_content = query + "\nLet’s think step by step. \n Answer: "
+    llm_res = llm_invoker(llm_query_content, args=args, max_tokens=args.max_tokens, json=False)
     response_report = reduce_inference(map_res_df, query, args)
     return response_report
 
