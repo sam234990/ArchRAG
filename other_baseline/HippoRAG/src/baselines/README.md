@@ -56,7 +56,7 @@ python src/baselines/ircot.py --dataset hotpotqa --retriever facebook/contriever
 
 ## ColBERTv2
 
-As mentioned in the main README, download the pre-trained ColBERTv2 [checkpoint](https://downloads.cs.stanford.edu/nlp/data/colbert/colbertv2/colbertv2.0.tar.gz) and put it under `exp/colbertv2.0`.
+As mentioned in the main README, download the pre-trained ColBERTv2 [checkpoint](https://downloads.cs.stanford.edu/nlp/data/colbert/colbertv2/colbertv2.0.tar.gz) and put it under `/mnt/data/wangshu/llm_lm/exp/colbertv2.0`.
 
 ```shell
 # MuSiQue

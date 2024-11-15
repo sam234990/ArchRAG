@@ -36,10 +36,6 @@ def init_langchain_model(llm: str, model_name: str, temperature: float = 0.0, ma
         # https://python.langchain.com/v0.1/docs/integrations/chat/ollama/
         from langchain_community.chat_models import ChatOllama
         return ChatOllama(model=model_name)  # e.g., 'llama3'
-    elif llm == 'llama.cpp':
-        # https://python.langchain.com/v0.2/docs/integrations/chat/llamacpp/
-        from langchain_community.chat_models import ChatLlamaCpp
-        return ChatLlamaCpp(model_path=model_name, verbose=True)  # model_name is the model path (gguf file)
     else:
         # add any LLMs you want to use here using LangChain
         raise NotImplementedError(f"LLM '{llm}' not implemented yet.")

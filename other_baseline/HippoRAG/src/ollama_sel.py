@@ -3,18 +3,20 @@ import time
 import random
 
 api_bases = [
-    "http://localhost:8876/",
-    "http://localhost:8877/",
-    "http://localhost:8878/",
-    "http://localhost:8879/",
-    "http://localhost:8880/",
-    "http://localhost:8881/",
-    "http://localhost:8882/",
-    "http://10.26.1.186:6666/",
-    "http://10.26.1.186:6667/",
-    "http://10.26.1.21:8876/",
-    "http://10.26.1.21:8877/",
+    # "http://localhost:8876/",
+    # "http://localhost:8877/",
+    # "http://localhost:8878/",
+    # "http://localhost:8879/",
+    # "http://localhost:8880/",
+    # "http://localhost:8881/",
+    # "http://localhost:8882/",
+    # "http://10.26.1.186:6666/",
+    # "http://10.26.1.186:6667/",
+    # "http://10.26.1.21:8876/",
+    # "http://10.26.1.21:8877/",
+    "http://localhost:11434",
 ]
+
 
 usage_count = {base: 0 for base in api_bases}
 lock = Lock()

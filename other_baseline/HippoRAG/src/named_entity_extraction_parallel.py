@@ -4,7 +4,7 @@ from functools import partial
 sys.path.append(".")
 
 from src.processing import extract_json_dict
-from langchain_community.chat_models import ChatOllama, ChatLlamaCpp
+from langchain_community.chat_models import ChatOllama
 
 sys.path.append(".")
 import argparse
@@ -60,14 +60,20 @@ def named_entity_recognition(client, text: str):
         response_content = chat_completion.content
         total_tokens = chat_completion.response_metadata["token_usage"]["total_tokens"]
         json_mode = True
-    elif isinstance(client, ChatOllama) or isinstance(client, ChatLlamaCpp):
+    elif isinstance(client, ChatOllama):
         # Ollama parallel
         client.base_url = get_ollama_serve_url()
-        response_content = client.invoke(query_ner_messages.to_messages())
+        chat_completion = client.invoke(query_ner_messages.to_messages())
         reset_ollama_serve_url(client.base_url)
 
+        token_usage = (
+            chat_completion.response_metadata["prompt_eval_count"]
+            + chat_completion.response_metadata["eval_count"]
+        )
+
+        response_content = chat_completion.content
         response_content = extract_json_dict(response_content)
-        total_tokens = len(response_content.split())
+        total_tokens = token_usage
     else:  # no JSON mode
         chat_completion = client.invoke(
             query_ner_messages.to_messages(),
@@ -116,7 +122,7 @@ if __name__ == "__main__":
         help="Specific model name",
     )
     parser.add_argument(
-        "--num_processes", type=int, default=10, help="Number of processes"
+        "--num_processes", type=int, default=4, help="Number of processes"
     )
 
     args = parser.parse_args()

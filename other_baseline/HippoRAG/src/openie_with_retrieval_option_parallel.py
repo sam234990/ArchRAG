@@ -2,7 +2,7 @@ import sys
 
 sys.path.append(".")
 
-from langchain_community.chat_models import ChatOllama, ChatLlamaCpp
+from langchain_community.chat_models import ChatOllama
 
 import argparse
 import json
@@ -34,7 +34,6 @@ def named_entity_recognition(passage: str):
 
     total_tokens = 0
     response_content = "{}"
-
     while not_done:
         try:
             if isinstance(client, ChatOpenAI):  # JSON mode
@@ -48,14 +47,20 @@ def named_entity_recognition(passage: str):
                 total_tokens += chat_completion.response_metadata["token_usage"][
                     "total_tokens"
                 ]
-            elif isinstance(client, ChatOllama) or isinstance(client, ChatLlamaCpp):
+            elif isinstance(client, ChatOllama):
                 # ollama parallel
                 client.base_url = get_ollama_serve_url()
-                response_content = client.invoke(ner_messages.to_messages())
+                chat_completion = client.invoke(ner_messages.to_messages())
                 reset_ollama_serve_url(client.base_url)
-                
+
+                token_usage = (
+                    chat_completion.response_metadata["prompt_eval_count"]
+                    + chat_completion.response_metadata["eval_count"]
+                )
+
+                response_content = chat_completion.content
                 response_content = extract_json_dict(response_content)
-                total_tokens += len(response_content.split())
+                total_tokens += token_usage
             else:  # no JSON mode
                 chat_completion = client.invoke(
                     ner_messages.to_messages(), temperature=0
@@ -71,6 +76,11 @@ def named_entity_recognition(passage: str):
             else:
                 response_content = response_content["named_entities"]
 
+            if not isinstance(response_content, list) or not all(
+                isinstance(item, str) for item in response_content
+            ):
+                raise Exception("Named entity response is not a list of strings")
+
             not_done = False
         except Exception as e:
             print("Passage NER exception")
@@ -85,6 +95,8 @@ def openie_post_ner_extract(passage: str, entities: list, model: str):
         passage=passage, named_entity_json=json.dumps(named_entity_json)
     )
 
+    total_tokens = 0
+
     try:
         if isinstance(client, ChatOpenAI):  # JSON mode
             chat_completion = client.invoke(
@@ -97,15 +109,21 @@ def openie_post_ner_extract(passage: str, entities: list, model: str):
             total_tokens = chat_completion.response_metadata["token_usage"][
                 "total_tokens"
             ]
-        elif isinstance(client, ChatOllama) or isinstance(client, ChatLlamaCpp):
+        elif isinstance(client, ChatOllama):
             # ollama parallel
             client.base_url = get_ollama_serve_url()
-            response_content = client.invoke(openie_messages.to_messages())
+            chat_completion = client.invoke(openie_messages.to_messages())
             reset_ollama_serve_url(client.base_url)
-            
+
+            token_usage = (
+                chat_completion.response_metadata["prompt_eval_count"]
+                + chat_completion.response_metadata["eval_count"]
+            )
+
+            response_content = chat_completion.content
             response_content = extract_json_dict(response_content)
             response_content = str(response_content)
-            total_tokens = len(response_content.split())
+            total_tokens += token_usage
         else:  # no JSON mode
             chat_completion = client.invoke(
                 openie_messages.to_messages(), temperature=0, max_tokens=4096
@@ -126,7 +144,7 @@ def openie_post_ner_extract(passage: str, entities: list, model: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--dataset", type=str, default="hotpotqa")
     parser.add_argument("--run_ner", action="store_true")
     parser.add_argument("--num_passages", type=str, default="10")
     parser.add_argument(
@@ -138,7 +156,7 @@ if __name__ == "__main__":
         default="gpt-3.5-turbo-1106",
         help="Specific model name",
     )
-    parser.add_argument("--num_processes", type=int, default=10)
+    parser.add_argument("--num_processes", type=int, default=4)
 
     args = parser.parse_args()
 
@@ -234,14 +252,18 @@ if __name__ == "__main__":
                 print("Using Auxiliary File: {}".format(auxiliary_file))
                 break
 
-    def extract_openie_from_triples(triple_json):
+    def extract_openie_from_triples(args):
+        triple_json, process_id = args
 
         new_json = []
         all_entities = []
-
         chatgpt_total_tokens = 0
 
-        for i, r in tqdm(triple_json, total=len(triple_json)):
+        for i, r in tqdm(
+            triple_json,
+            total=len(triple_json),
+            desc=f"Extracting OpenIE (Process {process_id})",
+        ):
 
             passage = r["passage"]
 
@@ -283,16 +305,18 @@ if __name__ == "__main__":
 
     splits = np.array_split(range(len(extracted_triples_subset)), num_processes)
 
-    args = []
+    args_list = []
 
-    for split in splits:
-        args.append([(i, extracted_triples_subset[i]) for i in split])
+    for process_id, split in enumerate(splits):
+        args_list.append(
+            ([(i, extracted_triples_subset[i]) for i in split], process_id)
+        )
 
     if num_processes > 1:
         with Pool(processes=num_processes) as pool:
-            outputs = pool.map(extract_openie_from_triples, args)
+            outputs = pool.map(extract_openie_from_triples, args_list)
     else:
-        outputs = [extract_openie_from_triples(arg) for arg in args]
+        outputs = [extract_openie_from_triples(arg) for arg in args_list]
 
     new_json = []
     all_entities = []

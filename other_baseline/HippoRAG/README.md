@@ -35,7 +35,7 @@ export OPENAI_API_KEY='Add your own OpenAI API key here.'
 export TOGETHER_API_KEY='Add your own TogetherAI API key here.'
 ```
 
-To use ColBERTv2, download the pre-trained [checkpoint](https://downloads.cs.stanford.edu/nlp/data/colbert/colbertv2/colbertv2.0.tar.gz) and put it under `exp/colbertv2.0`.
+To use ColBERTv2, download the pre-trained [checkpoint](https://downloads.cs.stanford.edu/nlp/data/colbert/colbertv2/colbertv2.0.tar.gz) and put it under `/mnt/data/wangshu/llm_lm/exp/colbertv2.0`.
 
 ```shell
 cd exp

@@ -86,9 +86,9 @@ class AnswerMetric(Metric):
         self._count = 0
 
     def __call__(
-            self,
-            predicted_answer: str,
-            ground_truth_answers: List[str],
+        self,
+        predicted_answer: str,
+        ground_truth_answers: List[str],
     ):
         exact_scores = metric_max_over_ground_truths(
             compute_exact, predicted_answer, ground_truth_answers
@@ -124,12 +124,8 @@ def evaluate(prediction: dict, gold: dict):
     pred = prediction["predicted_answer"]  # str
     gold_answers = [gold["answer"]] + gold["answer_aliases"]  # List[str]
 
-    exact_scores = metric_max_over_ground_truths(
-        compute_exact, pred, gold_answers
-    )
-    f1_scores = metric_max_over_ground_truths(
-        compute_f1, pred, gold_answers
-    )
+    exact_scores = metric_max_over_ground_truths(compute_exact, pred, gold_answers)
+    f1_scores = metric_max_over_ground_truths(compute_f1, pred, gold_answers)
 
     em = int(exact_scores)
     return em, f1_scores

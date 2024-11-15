@@ -40,15 +40,21 @@ ner_input_one_shot = """Paragraph:
 ```
 {}
 ```
-""".format(one_shot_passage)
+""".format(
+    one_shot_passage
+)
 
 ner_output_one_shot = one_shot_passage_entities
 
 ner_user_input = "Paragraph:```\n{user_input}\n```"
-ner_prompts = ChatPromptTemplate.from_messages([SystemMessage(ner_instruction),
-                                                HumanMessage(ner_input_one_shot),
-                                                AIMessage(ner_output_one_shot),
-                                                HumanMessagePromptTemplate.from_template(ner_user_input)])
+ner_prompts = ChatPromptTemplate.from_messages(
+    [
+        SystemMessage(ner_instruction),
+        HumanMessage(ner_input_one_shot),
+        AIMessage(ner_output_one_shot),
+        HumanMessagePromptTemplate.from_template(ner_user_input),
+    ]
+)
 
 ## Post NER OpenIE Prompts
 
@@ -70,11 +76,17 @@ Paragraph:
 {named_entity_json}
 """
 
-openie_post_ner_input_one_shot = openie_post_ner_frame.replace("{passage}", one_shot_passage).replace("{named_entity_json}", one_shot_passage_entities)
+openie_post_ner_input_one_shot = openie_post_ner_frame.replace(
+    "{passage}", one_shot_passage
+).replace("{named_entity_json}", one_shot_passage_entities)
 
 openie_post_ner_output_one_shot = one_shot_passage_triples
 
-openie_post_ner_prompts = ChatPromptTemplate.from_messages([SystemMessage(openie_post_ner_instruction),
-                                                            HumanMessage(openie_post_ner_input_one_shot),
-                                                            AIMessage(openie_post_ner_output_one_shot),
-                                                            HumanMessagePromptTemplate.from_template(openie_post_ner_frame)])
+openie_post_ner_prompts = ChatPromptTemplate.from_messages(
+    [
+        SystemMessage(openie_post_ner_instruction),
+        HumanMessage(openie_post_ner_input_one_shot),
+        AIMessage(openie_post_ner_output_one_shot),
+        HumanMessagePromptTemplate.from_template(openie_post_ner_frame),
+    ]
+)
