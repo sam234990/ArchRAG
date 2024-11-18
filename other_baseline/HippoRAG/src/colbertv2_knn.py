@@ -32,8 +32,14 @@ def retrieve_knn(kb, queries, duplicate=True, nns=100):
     ranking_output_path = "nbits_2_ranking.tsv"
     # index
     with Run().context(RunConfig(nranks=1, experiment="colbert", root="")):
-        config = ColBERTConfig(nbits=2, root="data/lm_vectors/colbert")
-        indexer = Indexer(checkpoint=checkpoint_path, config=config)
+        config = ColBERTConfig(
+            nbits=2,
+            root="data/lm_vectors/colbert",
+        )
+        indexer = Indexer(
+            checkpoint=checkpoint_path,
+            config=config,
+        )
         indexer.index(
             name="nbits_2",
             collection="data/lm_vectors/colbert/corpus.tsv",

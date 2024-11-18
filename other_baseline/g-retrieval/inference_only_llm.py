@@ -44,16 +44,17 @@ def truncate_to_n_tokens(
 
 def process_worker(dataset_part, llm_invoker_args):
     results = []
-
+    all_tokens = 0
     for i, data in enumerate(dataset_part):
         # Truncate data["desc"] to the first 512 tokens
         truncated_desc = truncate_to_n_tokens(data["desc"], 512)
         query_content = data["question"] + truncated_desc
-        llm_res = llm_invoker(
+        llm_res, cur_token = llm_invoker(
             query_content,
             args=llm_invoker_args,
             temperature=llm_invoker_args.temperature,
         )
+        all_tokens += cur_token
         tmp_res = {
             "id": data["id"],
             "question": data["question"],
@@ -64,7 +65,7 @@ def process_worker(dataset_part, llm_invoker_args):
         if i % (len(dataset_part) / 3) == 0:
             print(f"Processing {i}/{len(dataset_part)}")
 
-    return results
+    return results, all_tokens
 
 
 def main(args):
@@ -99,11 +100,15 @@ def main(args):
         )
 
     # 合并所有进程的返回结果
-    all_results = [item for sublist in results for item in sublist]
+    all_results = []
+    all_tokens = 0
+    for sublist, cur_token in results:
+        all_tokens += cur_token
+        all_results.extend(sublist)
     all_results_df = pd.DataFrame(all_results)
 
     # Step 4. Evaluating
-    # output_dir = 
+    # output_dir =
     output_dir = dataset_output_dir[dataset_name]
     os.makedirs(f"{output_dir}/{dataset_name}", exist_ok=True)
     path = f"{output_dir}/{dataset_name}/model_name_{args.temperature}.csv"

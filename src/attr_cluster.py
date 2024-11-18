@@ -291,6 +291,7 @@ def attr_cluster(
     level = 1
     graph = init_graph
     community_df = pd.DataFrame()
+    all_token = 0
     while level <= max_level:
         print(f"Start clustering for level {level}")
 
@@ -350,7 +351,7 @@ def attr_cluster(
             ].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
         else:
             print("Generating new community report.")
-            new_community_df = community_report_batch(
+            new_community_df, cur_token = community_report_batch(
                 communities=updated_c_n_mapping,
                 c_c_mapping=c_c_mapping,
                 final_entities=final_entities,
@@ -360,6 +361,8 @@ def attr_cluster(
                 error_save_path=tmp_comunity_df_error,
                 args=args,
             )
+            all_token += cur_token
+            print(f"cur token usage for current level: {cur_token}")
 
         # update
         graph, new_community_df = reconstruct_graph(
@@ -374,7 +377,7 @@ def attr_cluster(
         if number_of_clusters < min_clusters:
             break
 
-    return community_df
+    return community_df, all_token
 
 
 if __name__ == "__main__":
@@ -383,7 +386,7 @@ if __name__ == "__main__":
     print_args(args)
     
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
-    community_df = attr_cluster(
+    community_df, all_token = attr_cluster(
         init_graph=graph,
         final_entities=final_entities,
         final_relationships=final_relationships,
@@ -394,6 +397,8 @@ if __name__ == "__main__":
 
     output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/communities.csv"
     community_df.to_csv(output_path, index=False)
+    print(f"Community report saved to {output_path}")
+    print(f"Total token usage: {all_token}")
 
     # results_by_level = attribute_hierarchical_clustering(cos_graph, final_entities)
 

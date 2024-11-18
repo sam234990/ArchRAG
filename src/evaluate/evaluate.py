@@ -118,14 +118,13 @@ def get_accuracy_webqsp_qa(path, pred_col="pred", label_col="label"):
     pre = sum(precission_list) * 100 / len(precission_list)
     recall = sum(recall_list) * 100 / len(recall_list)
     
-    if pred_col != "pred":
-        df['acc'] = acc_list
-        df['hit'] = hit_list  
-        df['f1'] = f1_list
-        df['precision'] = precission_list
-        df['recall'] = recall_list
-        
-        df.to_csv(path, index=False)
+    df['acc_' + pred_col] = acc_list
+    df['hit' + pred_col] = hit_list  
+    df['f1' + pred_col] = f1_list
+    df['precision' + pred_col] = precission_list
+    df['recall' + pred_col] = recall_list
+    
+    df.to_csv(path, index=False)
     
     print(f"Accuracy: {acc:.4f}")
     print(f"Hit: {hit:.4f}")
@@ -256,6 +255,7 @@ dataset_name_path = {
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
     "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa.json",
+    "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/webqsp_qa.json",
 }
 
 baseline_save_path_dict = {
@@ -264,6 +264,7 @@ baseline_save_path_dict = {
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
     "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
+    "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/baseline",
 }
 
 

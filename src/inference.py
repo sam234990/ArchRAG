@@ -20,8 +20,8 @@ def hcarag(
     graph,
     args,
 ):
-
-    topk_entity, topk_community, topk_related_r = hcarag_retrieval(
+    all_token = 0
+    topk_entity, topk_community, topk_related_r, token_used = hcarag_retrieval(
         query_content=query_content,
         hc_index=hc_index,
         entity_df=entity_df,
@@ -32,8 +32,8 @@ def hcarag(
         graph=graph,
         args=args,
     )
-
-    response_report = hcarag_inference(
+    all_token += token_used
+    response_report, total_token = hcarag_inference(
         topk_entity,
         topk_community,
         topk_related_r,
@@ -42,7 +42,8 @@ def hcarag(
         args,
         query_paras=query_paras,
     )
-    return response_report
+    all_token += total_token
+    return response_report, all_token
 
 
 def get_topk_related_r(query_embedding, relation_df, topk=10):
@@ -90,7 +91,7 @@ def hcarag_retrieval(
         query_embedding = np.expand_dims(query_embedding, axis=0)
 
     hc_level = hc_index.hchnsw.max_level
-    final_k, k_per_level = load_strategy(
+    final_k, k_per_level, token_used = load_strategy(
         query_paras=query_paras,
         number_levels=hc_level + 1,
         entity_df=entity_df,
@@ -151,7 +152,7 @@ def hcarag_retrieval(
         )
 
     if query_paras["ppr_refine"] is False:
-        return topk_entity, topk_community, topk_related_r
+        return topk_entity, topk_community, topk_related_r, token_used
     else:
 
         # 从 topk_entity 获取 ppr 所需的 personalization 信息
@@ -190,14 +191,14 @@ def hcarag_retrieval(
                 query_embedding, ppr_sel_r_df, topk=query_paras["topk_e"]
             )
 
-        return ppr_topk_entity, topk_community, ppr_topk_related_r
+        return ppr_topk_entity, topk_community, ppr_topk_related_r, token_used
 
 
 def hcarag_inference(
     topk_entity, topk_community, topk_related_r, query, max_retries, args, query_paras
 ):
     if query_paras["generate_strategy"] == "direct":
-        response_report = hcarag_inference_direct(
+        response_report, total_token = hcarag_inference_direct(
             topk_entity,
             topk_community,
             topk_related_r,
@@ -207,7 +208,7 @@ def hcarag_inference(
             args,
         )
     else:
-        response_report = hcarag_inference_mr(
+        response_report, total_token = hcarag_inference_mr(
             topk_entity,
             topk_community,
             topk_related_r,
@@ -219,7 +220,7 @@ def hcarag_inference(
     if response_report["pred"] == "":
         response_report["pred"] = "No answer found."
 
-    return response_report
+    return response_report, total_token
 
 
 def hcarag_inference_direct(
@@ -244,10 +245,13 @@ def hcarag_inference_direct(
     retries = 0
     direct_answer = ""
     raw_result = ""
+    total_token = 0
 
     while retries < max_retries:
-        raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=False)
-
+        raw_result, cur_token = llm_invoker(
+            content, args, max_tokens=args.max_tokens, json=False
+        )
+        total_token += cur_token
         success, direct_answer = qa_response_extract(raw_result)
         if success:
             break
@@ -255,7 +259,7 @@ def hcarag_inference_direct(
 
     response_report = {"pred": direct_answer, "raw_result": raw_result}
 
-    return response_report
+    return response_report, total_token
 
 
 def hcarag_inference_mr(
@@ -266,12 +270,15 @@ def hcarag_inference_mr(
     query_paras,
     args,
 ):
+    all_token = 0
+    
     llm_query_content = query + "\nLet’s think step by step. \n Answer: "
-    llm_res = llm_invoker(
+    llm_res, cur_token = llm_invoker(
         llm_query_content, args=args, max_tokens=args.max_tokens, json=False
     )
-
-    map_res_df = map_inference(
+    all_token += cur_token
+    
+    map_res_df, cur_token_map = map_inference(
         entity_df=topk_entity,
         community_df=topk_community,
         relation_df=topk_related_r,
@@ -280,8 +287,12 @@ def hcarag_inference_mr(
         query_paras=query_paras,
         args=args,
     )
-    response_report = reduce_inference(map_res_df, query, args)
-    return response_report
+    all_token += cur_token_map
+    
+    response_report, cur_token_reduce = reduce_inference(map_res_df, query, args)
+    all_token += cur_token_reduce
+    
+    return response_report, all_token
 
 
 def load_strategy(
@@ -299,11 +310,11 @@ def load_strategy(
         k_final = query_paras["k_final"]
         k_per_level = [k_each_level] * number_levels
 
-        return k_final, k_per_level
+        return k_final, k_per_level, 0
     elif strategy == "inference":
         k_final = query_paras["k_final"]
 
-        level_weight, raw_result = problem_reasoning(
+        level_weight, raw_result, all_token = problem_reasoning(
             query_content=query_paras["query_content"],
             entity_df=entity_df,
             community_df=community_df,
@@ -320,7 +331,7 @@ def load_strategy(
         print("inference k per level is:")
         for k in k_per_level:
             print(k, end="; ")
-        return k_final, k_per_level
+        return k_final, k_per_level, all_token
     else:
         raise ValueError("Invalid strategy.")
 
@@ -424,7 +435,7 @@ if __name__ == "__main__":
         "response_type": "QA",
         "involve_llm_res": True,
     }
-    response = hcarag(
+    response, total_token = hcarag(
         test_question,
         hc_index,
         entity_df,
@@ -437,3 +448,4 @@ if __name__ == "__main__":
     )
     print(response["raw_result"])
     print(response["pred"])
+    print(f"Total tokens: {total_token}")

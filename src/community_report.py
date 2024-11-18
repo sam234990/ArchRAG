@@ -101,11 +101,13 @@ def generate_community_report(community_text, args, community_id, max_generate=3
     success = False
     raw_result = None
     extract_result = None
-
+    all_tokens = 0
+    
     while not success and retries < max_generate:
-        raw_result = llm_invoker(
+        raw_result, cur_token = llm_invoker(
             report_prompt, args, max_tokens=args.max_tokens, json=True
         )
+        all_tokens += cur_token
         try:
             output = json.loads(raw_result)
 
@@ -129,9 +131,9 @@ def generate_community_report(community_text, args, community_id, max_generate=3
                 "rating": None,
                 "rating_explanation": None,
             }
-        return None, extract_result
+        return None, extract_result, all_tokens
 
-    return raw_result, extract_result
+    return raw_result, extract_result, all_tokens
 
 
 def report_embedding(community_report, community_text, args):
@@ -239,7 +241,7 @@ def community_report_worker(
         max_tokens=args.max_tokens,
     )
 
-    raw_result, community_report = generate_community_report(
+    raw_result, community_report, all_tokens = generate_community_report(
         community_text, args, community_id
     )
 
@@ -254,7 +256,7 @@ def community_report_worker(
     if not community_report.get("title"):
         community_report["title"] = f"CommunityID{community_id}"
 
-    return community_report
+    return community_report, all_tokens
 
 
 def community_report_batch(
@@ -268,7 +270,8 @@ def community_report_batch(
     level_dict: dict[str, int],
 ):
     results_community = []
-
+    total_tokens = 0
+    
     # 创建进程池
     with mp.Pool(processes=args.num_workers) as pool:
 
@@ -285,7 +288,10 @@ def community_report_batch(
 
         # 并行处理每个社区
         try:
-            results_community = pool.starmap(process_func, communities.items())
+            results = pool.starmap(process_func, communities.items())
+            for community_report, all_tokens in results:
+                results_community.append(community_report)
+                total_tokens += all_tokens
         except Exception as e:
             logging.error(f"Error processing communities: {e}")
             # 保存已成功的结果
@@ -299,33 +305,34 @@ def community_report_batch(
         community_df, args, num_workers=args.embedding_num_workers
     )
 
-    return community_df
+    return community_df, total_tokens
 
 
 def community_report_for_level(
     results_by_level, args, final_entities, final_relationships
 ):
     results_community = []
-
+    all_tokens = 0
     for level, communities in results_by_level.items():
         print(f"Create community report for level: {level} ")
         print(f"Number of communities in this level: {len(communities)}")
         # 构建一个 level_dict，key 为 community_id，value 为 level
         level_dict = {community_id: level for community_id in communities.keys()}
 
-        res = community_report_batch(
+        res, cur_token = community_report_batch(
             communities=communities,
             final_entities=final_entities,
             final_relationships=final_relationships,
             args=args,
             level_dict=level_dict,
         )
+        all_tokens += cur_token
 
         results_community.append(res)  # 将 DataFrame 添加到列表中
 
     # 使用 pd.concat 合并所有 DataFrame
     community_df = pd.concat(results_community, ignore_index=True)
-    return community_df
+    return community_df, all_tokens
 
 
 def confirm_community_result(results_by_level):

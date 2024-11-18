@@ -897,12 +897,19 @@ def create_inference_arg_parser():
         default=False,
         help="only use entity to inference",
     )
-    
+
     parser.add_argument(
         "--ppr_refine",
         type=lambda x: x.lower() == "true",
         default=False,
         help="Whether to use ppr refine the entity search or not",
+    )
+
+    parser.add_argument(
+        "--involve_llm_res",
+        type=lambda x: x.lower() == "true",
+        default=True,
+        help="Whether to involve llm response in the final result or not",
     )
 
     parser.add_argument(

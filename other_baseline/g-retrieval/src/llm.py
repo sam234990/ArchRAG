@@ -45,11 +45,13 @@ def llm_invoker(
     retries = 0
     success = False
     result = None
+    total_token = 0
 
     while not success and retries < max_retries:
         try:
             response = client.chat.completions.create(**parameters)
             result = response.choices[0].message.content
+            total_token += response.usage.total_tokens
             success = True
         except Exception as e:
             retries += 1
@@ -61,10 +63,11 @@ def llm_invoker(
         # 可以抛出异常或返回 None
         raise Exception("Failed to get a response from OpenAI after multiple retries.")
 
-    return result
+    return result, total_token
 
 
 if __name__ == "__main__":
     test_input_text = "What is the capital of France?"
-    result = llm_invoker(test_input_text)
+    result, total_token = llm_invoker(test_input_text)
     print(f"llm_invoker result: {result}")
+    print(f"llm_invoker total_token: {total_token}")

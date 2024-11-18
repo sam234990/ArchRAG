@@ -39,7 +39,7 @@ def process_question(
     if (idx % 100 == 0) and args.print_log:
         print(f"Processing question at index {idx}: {question}")
     try:
-        response_report = hcarag(
+        response_report, total_token = hcarag(
             query_content=question,
             hc_index=hc_index,
             entity_df=entity_df,
@@ -50,7 +50,7 @@ def process_question(
             graph=graph,
             args=args,
         )
-        return idx, response_report
+        return idx, response_report, total_token
     except Exception as e:
         logging.error(f"Error processing question at index {idx}: {e}")
         return idx, None
@@ -123,12 +123,14 @@ def test_qa(query_paras, args):
 
         # 使用 enumerate 处理每个问题，确保索引正确
         results = pool.starmap(
-            process_func, [(idx, row) for idx, row in qa_df.iterrows()]
+            process_func, [(idx, row, total_token) for idx, row in qa_df.iterrows()]
         )
 
+    all_token = 0
     # 将结果合并回 qa_df
-    for idx, response_report in results:
+    for idx, response_report, total_token in results:
         # 确保索引有效
+        all_token += total_token
         if isinstance(response_report, dict):
             qa_df.loc[idx, "raw_result"] = response_report.get("raw_result", "None")
             qa_df.loc[idx, "pred"] = response_report.get("pred", "None")
@@ -137,6 +139,7 @@ def test_qa(query_paras, args):
             qa_df.loc[idx, "pred"] = "None"
 
     print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
+    print(f"Total token: {all_token}")
 
     qa_df["pred"] = qa_df["pred"].fillna("No Answer", inplace=False)
 
@@ -314,6 +317,7 @@ if __name__ == "__main__":
         "ppr_refine": args.ppr_refine,
         "generate_strategy": args.generate_strategy,
         "response_type": args.response_type,
+        "involve_llm_res": args.involve_llm_res,
     }
     # query_paras = {
     #     "strategy": "global",

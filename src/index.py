@@ -8,6 +8,7 @@ import time
 
 
 def make_hc_index(args):
+    all_token = 0
     overall_start_time = time.time()
     graph, entities_df, final_relationships = read_graph_nx(
         file_path=args.base_path,
@@ -18,7 +19,7 @@ def make_hc_index(args):
         f"Finished reading graph in {time.time() - overall_start_time:.2f} seconds ()"
     )
 
-    community_df: pd.DataFrame = attr_cluster(
+    community_df, token_usage = attr_cluster(
         init_graph=graph,
         final_entities=entities_df,
         final_relationships=final_relationships,
@@ -26,6 +27,8 @@ def make_hc_index(args):
         max_level=args.max_level,
         min_clusters=args.min_clusters,
     )
+    all_token += token_usage
+    print(f"Token usage for clustering: {token_usage}")
     print("finish compute hierarchical clusters")
     print(
         f"Finished computing hierarchical clusters in {time.time() - overall_start_time:.2f} seconds ()"
@@ -73,12 +76,13 @@ def make_hc_index(args):
     )
     print("finish compute HC HNSW")
 
-    make_level_summary(community_df, args.output_dir, args)
+    l_s_token = make_level_summary(community_df, args.output_dir, args)
     print(
         f"Finished making level summary in {time.time() - overall_start_time:.2f} seconds ()"
     )
-
     print("finish make level summary")
+    all_token += l_s_token
+    print(f"Token usage for level summary: {l_s_token}")
 
     f_c_save_path = os.path.join(args.output_dir, "community_df_index.csv")
     final_community_df.to_csv(f_c_save_path, index=False)
@@ -107,15 +111,18 @@ def make_hc_index(args):
     print(
         f"Finished computing HCa RAG index in {time.time() - overall_start_time:.2f} seconds ()"
     )
+    print(f"Create Index Total Token Usage: {all_token}")
 
 
 def make_level_summary(community_df, save_path, args):
     max_level = community_df["level"].max()
     print(f"The maximum level is: {max_level}")
-    level_summary_df = level_summary(community_df, max_level, args)
+    
+    level_summary_df, all_token = level_summary(community_df, max_level, args)
 
     level_summary_path = os.path.join(save_path, "level_summary.csv")
     level_summary_df.to_csv(level_summary_path, index=False)
+    return all_token
 
 
 if __name__ == "__main__":

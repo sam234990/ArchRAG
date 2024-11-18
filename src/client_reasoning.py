@@ -33,9 +33,11 @@ def problem_reasoning(
     reason_level = []
     retry = 0
     success = False
-
+    all_token = 0
+    
     while not success and retry < max_retries:
-        reason_level = llm_invoker(infer_content, args, json=True)
+        reason_level, cur_token = llm_invoker(infer_content, args, json=True)
+        all_token += cur_token
         try:
             output: dict = json.loads(reason_level)
             raw_result, rate_list, success = extract_level(output, max_level)
@@ -59,7 +61,7 @@ def problem_reasoning(
     else:
         reason_level = [5] * (max_level + 1)
 
-    return reason_level, raw_result
+    return reason_level, raw_result, all_token
 
 
 def prep_level_infer_content(
@@ -188,9 +190,11 @@ def generate_level_summary(content, max_retries, args):
     retries = 0
     success = False
     level_summary = ""
+    all_token = 0
 
     while not success and retries < max_retries:
-        raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
+        raw_result, cur_token = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
+        all_token+= cur_token
         try:
             output = json.loads(raw_result)
             if "summary" in output:
@@ -206,17 +210,18 @@ def generate_level_summary(content, max_retries, args):
 
     level_report = {"summary": level_summary, "raw_result": raw_result}
 
-    return level_report
+    return level_report, all_token
 
 
 def level_summary(community_df, max_level, args):
-
+    all_token = 0
     level_summary = []
     for level in range(1, max_level + 1):
         level_content = prep_level_content(
             level, max_level, community_df, sample_size=3, max_tokens=args.max_tokens
         )
-        report = generate_level_summary(level_content, args.max_retries, args)
+        report, cur_token = generate_level_summary(level_content, args.max_retries, args)
+        all_token += cur_token
         report["level"] = level
         level_comunity_number = community_df[community_df["level"] == level].shape[0]
         report["comunity_number"] = level_comunity_number
@@ -224,7 +229,7 @@ def level_summary(community_df, max_level, args):
         level_summary.append(report)
 
     level_summary = pd.DataFrame(level_summary)
-    return level_summary
+    return level_summary, all_token
 
 
 def trim_e_r_content(community_nodes, relationships):
@@ -399,12 +404,14 @@ def prep_map_content(
     return all_chunks
 
 
-def map_llm_worker(content, args) -> list[Dict[str, Any]]:
+def map_llm_worker(content, args) -> Tuple[list[Dict[str, Any]], int]:
     retries = 0
     points_data = []  # List to hold the descriptions and scores
-
+    all_token = 0
+    
     while retries < args.max_retries:
-        raw_result = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
+        raw_result, cur_token = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
+        all_token += cur_token
         output, json_output = try_parse_json_object(raw_result or "")
 
         if "points" in json_output and isinstance(json_output["points"], list):
@@ -432,7 +439,7 @@ def map_llm_worker(content, args) -> list[Dict[str, Any]]:
 
         retries += 1
 
-    return points_data
+    return points_data, all_token
 
 
 def map_inference(
@@ -460,14 +467,17 @@ def map_inference(
 
     if parallel_flag == False:
         all_result = []
+        all_token = 0
         for chunk in all_chunks:
-            res = map_llm_worker(chunk, args)
+            res, cur_token = map_llm_worker(chunk, args)
+            all_token += cur_token
             all_result.extend(res)
 
         res_df = pd.DataFrame(all_result)
-        return res_df
+        return res_df, all_token
     else:
         max_workers = max(len(all_chunks), args.num_workers)
+        all_token = 0
 
         with mp.Pool(processes=max_workers) as pool:
             results = pool.starmap(
@@ -476,10 +486,13 @@ def map_inference(
             )
 
         # Flatten the results to a 1D list
-        flattened_results = [item for sublist in results for item in sublist]
+        flattened_results = []
+        for sublist, tokens in results:
+            flattened_results.extend(sublist)
+            all_token += tokens
 
         res_df = pd.DataFrame(flattened_results)
-    return res_df
+        return res_df, all_token
 
 
 def prep_reduce_content(map_response_df: pd.DataFrame, max_tokens=4096) -> str:
@@ -543,11 +556,13 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
     retries = 0
     direct_answer = ""
     raw_result = ""
+    all_token = 0
 
     while retries < args.max_retries:
-        raw_result = llm_invoker(
+        raw_result, cur_token = llm_invoker(
             reduce_prompt, args, max_tokens=args.max_tokens, json=False
         )
+        all_token += cur_token
         success, direct_answer = qa_response_extract(raw_result)
         if success:
             break
@@ -555,7 +570,7 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
 
     response_report = {"pred": direct_answer, "raw_result": raw_result}
 
-    return response_report
+    return response_report, all_token
 
 
 def qa_response_extract(response_content: str):

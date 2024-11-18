@@ -1,6 +1,4 @@
-#!/bin/bash
-
-source activate rag
+conda activate rag
 
 strategy="global"
 k_each_level=10
@@ -19,13 +17,13 @@ num_workers=20
 
 eval_mode="DocQA"
 
-output_dir="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b"
-base_path="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag"
+output_dir="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b"
+base_path="/mnt/data/wangshu/hcarag/HotpotQA/hcarag"
 
 relationship_filename="create_final_relationships.parquet"
 entity_filename="create_final_entities.parquet"
 
-dataset_name="multihop"
+dataset_name="hotpot"
 
 log_file="./eval/evaluate_t${temperature}_${strategy}_${k_each_level}_${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_${response_type}.log"
 python_file="/home/wangshu/rag/hier_graph_rag/src/evaluate/test_qa.py"
@@ -38,7 +36,7 @@ nohup python -u $python_file --strategy $strategy --k_each_level $k_each_level \
     --generate_strategy $generate_strategy --response_type $response_type \
     --temperature $temperature --eval_mode $eval_mode \
     --output_dir $output_dir --base_path $base_path --dataset_name $dataset_name \
-    --relationship_filename $relationship_filename --entity_filename $entity_filename \
+    --relationship_filename $relationship_filename \
     --only_entity $only_entity --num_workers $num_workers  --ppr_refine $ppr_refine  \
     >$log_file 2>&1 &
 

@@ -18,6 +18,8 @@ python src/create_graph.py --dataset $data --model_name colbertv2 \
     --extraction_model $extraction_model --threshold $syn_thresh \
     --extraction_type $extraction_type --cosine_sim_edges
 
+export PATH=$PATH:/home/wangshu/anaconda3/envs/hipporag/bin
+
 #Getting Nearest Neighbor Files
 CUDA_VISIBLE_DEVICES=$available_gpus python src/colbertv2_knn.py --filename output/kb_to_kb.tsv
 CUDA_VISIBLE_DEVICES=$available_gpus python src/colbertv2_knn.py --filename output/query_to_kb.tsv

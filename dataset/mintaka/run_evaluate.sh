@@ -32,7 +32,8 @@ export PYTHONPATH="/home/wangshu/rag/hier_graph_rag/:$PYTHONPATH"
 nohup python -u $python_file --strategy $strategy --k_each_level $k_each_level \
     --k_final $k_final --all_k_inference $all_k_inference --topk_e $topk_e \
     --generate_strategy $generate_strategy --response_type $response_type \
-    --output_dir $output_dir --base_path $base_path  --relationship_filename $relationship_filename --dataset_name $dataset_name \
+    --output_dir $output_dir --base_path $base_path \
+    --relationship_filename $relationship_filename --entity_filename $entity_filename --dataset_name $dataset_name \
     --temperature $temperature --num_workers $num_workers \
     --only_entity $only_entity --ppr_refine $ppr_refine >$log_file 2>&1 &
 
