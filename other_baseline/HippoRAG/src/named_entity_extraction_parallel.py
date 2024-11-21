@@ -62,9 +62,9 @@ def named_entity_recognition(client, text: str):
         json_mode = True
     elif isinstance(client, ChatOllama):
         # Ollama parallel
-        client.base_url = get_ollama_serve_url()
+        # client.base_url = get_ollama_serve_url()
         chat_completion = client.invoke(query_ner_messages.to_messages())
-        reset_ollama_serve_url(client.base_url)
+        # reset_ollama_serve_url(client.base_url)
 
         token_usage = (
             chat_completion.response_metadata["prompt_eval_count"]

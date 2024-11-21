@@ -123,7 +123,7 @@ def test_qa(query_paras, args):
 
         # 使用 enumerate 处理每个问题，确保索引正确
         results = pool.starmap(
-            process_func, [(idx, row, total_token) for idx, row in qa_df.iterrows()]
+            process_func, [(idx, row) for idx, row in qa_df.iterrows()]
         )
 
     all_token = 0

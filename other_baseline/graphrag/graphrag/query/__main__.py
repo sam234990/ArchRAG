@@ -91,7 +91,7 @@ if __name__ == "__main__":
         "--max_concurrent",
         type=int,
         help="The maximum number of concurrent tasks to run",
-        default=12,
+        default=20,
     )
 
     args = parser.parse_args()

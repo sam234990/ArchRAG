@@ -91,7 +91,7 @@ async def global_search(
     community_level: int,
     response_type: str,
     query: str,
-) -> str | dict[str, Any] | list[dict[str, Any]]:
+) -> tuple[str | dict[str, Any] | list[dict[str, Any]], int]:
     """Perform a global search.
 
     Parameters
@@ -122,7 +122,7 @@ async def global_search(
     )
     result = await search_engine.asearch(query=query)
     reporter.success(f"Global Search Response: {result.response}")
-    return result.response
+    return result.response, result.prompt_tokens
 
 
 @validate_call(config={"arbitrary_types_allowed": True})

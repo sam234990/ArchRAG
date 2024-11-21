@@ -13,6 +13,9 @@
         "nbits": 2,
         "kmeans_niters": 20,
         "resume": false,
+        "pool_factor": 1,
+        "clustering_mode": "hierarchical",
+        "protected_tokens": 0,
         "similarity": "cosine",
         "bsize": 64,
         "accumsteps": 1,
@@ -43,7 +46,7 @@
         "root": "",
         "experiment": "colbert",
         "index_root": null,
-        "name": "2024-11\/16\/22.04.34",
+        "name": "2024-11\/21\/19.33.59",
         "rank": 0,
         "nranks": 1,
         "amp": true,
@@ -52,6 +55,6 @@
     },
     "num_chunks": 3,
     "num_partitions": 8192,
-    "num_embeddings_est": 368318.19414424896,
-    "avg_doclen_est": 6.6601243019104
+    "num_embeddings_est": 371470.2404022217,
+    "avg_doclen_est": 6.669124603271484
 }

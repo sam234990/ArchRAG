@@ -49,9 +49,9 @@ def named_entity_recognition(passage: str):
                 ]
             elif isinstance(client, ChatOllama):
                 # ollama parallel
-                client.base_url = get_ollama_serve_url()
+                # client.base_url = get_ollama_serve_url()
                 chat_completion = client.invoke(ner_messages.to_messages())
-                reset_ollama_serve_url(client.base_url)
+                # reset_ollama_serve_url(client.base_url)
 
                 token_usage = (
                     chat_completion.response_metadata["prompt_eval_count"]
@@ -111,9 +111,9 @@ def openie_post_ner_extract(passage: str, entities: list, model: str):
             ]
         elif isinstance(client, ChatOllama):
             # ollama parallel
-            client.base_url = get_ollama_serve_url()
+            # client.base_url = get_ollama_serve_url()
             chat_completion = client.invoke(openie_messages.to_messages())
-            reset_ollama_serve_url(client.base_url)
+            # reset_ollama_serve_url(client.base_url)
 
             token_usage = (
                 chat_completion.response_metadata["prompt_eval_count"]

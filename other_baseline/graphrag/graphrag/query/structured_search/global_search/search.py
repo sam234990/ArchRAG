@@ -156,15 +156,6 @@ class GlobalSearch(BaseSearch):
             prompt_tokens=map_prompt_tokens + reduce_response.prompt_tokens,
         )
 
-    def save_str(self, content, file_name):
-        import os
-
-        base_path = "/home/wangshu/rag/graphrag/ragtest/debug"
-        file_path = os.path.join(base_path, file_name)
-
-        with open(file_path, "w") as f:
-            f.write(content)
-
     def search(
         self,
         query: str,
@@ -196,7 +187,6 @@ class GlobalSearch(BaseSearch):
                     "content": search_prompt + "\n\n### USER QUESTION ### \n\n" + query,
                 }
             ]
-            self.save_str(search_prompt, "search_prompt.txt")
 
             async with self.semaphore:
                 search_response = await self.llm.agenerate(
@@ -348,11 +338,17 @@ class GlobalSearch(BaseSearch):
             )
             if self.allow_general_knowledge:
                 search_prompt += "\n" + self.general_knowledge_inclusion_prompt
+            # search_messages = [
+            #     {"role": "system", "content": search_prompt},
+            #     {"role": "user", "content": query},
+            # ]
+            
             search_messages = [
-                {"role": "system", "content": search_prompt},
-                {"role": "user", "content": query},
+                {
+                    "role": "user",
+                    "content": search_prompt + "\n\n### USER QUESTION ### \n\n" + query,
+                }
             ]
-            self.save_str(search_prompt, "reduce_prompt.txt")
 
             search_response = await self.llm.agenerate(
                 search_messages,

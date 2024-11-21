@@ -152,7 +152,7 @@ async def limited_search(
     semaphore,
 ):
     async with semaphore:
-        return await api.global_search(
+        response, tokens = await api.global_search(
             config=config,
             nodes=final_nodes,
             entities=final_entities,
@@ -161,6 +161,7 @@ async def limited_search(
             response_type=response_type,
             query=query,
         )
+        return response, tokens
 
 
 async def process_dataset_queries(
@@ -193,8 +194,17 @@ async def process_dataset_queries(
     # 并发执行所有任务，并返回结果
     results = await asyncio.gather(*tasks)
 
+    responses = []
+    all_tokens = 0
+    for response, tokens in results:
+        responses.append(response)
+        all_tokens += tokens
+    
     # 将结果写入 DataFrame 的新列 'pred'
-    dataset["pred"] = results
+    dataset["pred"] = responses
+    
+    # 输出总 token 数
+    print(f"Total tokens used: {all_tokens}")
 
     return dataset
 

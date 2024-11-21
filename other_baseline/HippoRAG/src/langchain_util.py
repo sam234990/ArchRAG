@@ -35,7 +35,10 @@ def init_langchain_model(llm: str, model_name: str, temperature: float = 0.0, ma
     elif llm == 'ollama':
         # https://python.langchain.com/v0.1/docs/integrations/chat/ollama/
         from langchain_community.chat_models import ChatOllama
-        return ChatOllama(model=model_name)  # e.g., 'llama3'
+        base_url = "http://localhost:5000/forward"
+        client = ChatOllama(model=model_name, base_url=base_url)  # e.g., 'llama3'
+        return client
+        # return ChatOllama(model=model_name)  # e.g., 'llama3'
     else:
         # add any LLMs you want to use here using LangChain
         raise NotImplementedError(f"LLM '{llm}' not implemented yet.")
