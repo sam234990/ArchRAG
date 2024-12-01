@@ -123,18 +123,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str)
     parser.add_argument(
-        "--llm", type=str, default="openai", help="LLM, e.g., 'openai' or 'together'"
+        "--llm", type=str, default="ollama", help="LLM, e.g., 'openai' or 'together'"
     )
     parser.add_argument(
         "--llm_model",
         type=str,
-        default="gpt-3.5-turbo-1106",
+        default="llama3.1:8b4k",
         help="Specific model name",
     )
     parser.add_argument("--retriever", type=str, default="facebook/contriever")
     parser.add_argument("--prompt", type=str)
     parser.add_argument(
-        "--num_demo", type=int, default=1, help="the number of demo samples"
+        "--num_demo", type=int, default=0, help="the number of demo samples"
     )
     parser.add_argument("--max_steps", type=int)
     parser.add_argument(

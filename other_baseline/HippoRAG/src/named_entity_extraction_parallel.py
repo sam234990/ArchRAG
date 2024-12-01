@@ -113,12 +113,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str)
     parser.add_argument(
-        "--llm", type=str, default="openai", help="LLM, e.g., 'openai' or 'together'"
+        "--llm", type=str, default="ollama", help="LLM, e.g., 'openai' or 'together'"
     )
     parser.add_argument(
         "--model_name",
         type=str,
-        default="gpt-3.5-turbo-1106",
+        default="llama3.1:8b4k",
         help="Specific model name",
     )
     parser.add_argument(
@@ -177,7 +177,9 @@ if __name__ == "__main__":
                 query_triples.extend(output[0])
                 chatgpt_total_tokens += output[1]
 
-            current_cost = 0.002 * chatgpt_total_tokens / 1000
+            print(
+                f"LLM token total cost in named_entity_extraction_parallel:{chatgpt_total_tokens}"
+            )
 
             queries_df["triples"] = query_triples
             queries_df.to_csv(output_file, sep="\t")

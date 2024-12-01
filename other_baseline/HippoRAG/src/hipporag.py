@@ -199,7 +199,7 @@ class HippoRAG:
         self.statistics = {}
         self.ensembling_debug = []
         if qa_model is None:
-            qa_model = LangChainModel("openai", "gpt-3.5-turbo")
+            qa_model = LangChainModel("ollama", "llama3.1:8b4k")
         self.qa_model = init_langchain_model(qa_model.provider, qa_model.model_name)
 
     def get_passage_by_idx(self, passage_idx):

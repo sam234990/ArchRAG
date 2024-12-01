@@ -56,6 +56,19 @@ def exact_match_score(prediction, ground_truth):
     return 1 if normalize_answer(prediction) == normalize_answer(ground_truth) else 0
 
 
+def match(s1: str, s2: str) -> bool:
+    s1 = normalize_answer(s1)
+    s2 = normalize_answer(s2)
+    return s2 in s1
+
+
+def eval_hit(prediction: str, answer: list):
+    for a in answer:
+        if match(prediction, a):
+            return 1
+    return 0
+
+
 def update_answer(metrics, prediction, gold):
     em = exact_match_score(prediction, gold)
     f1, precision, recall = f1_score(prediction, gold)
@@ -63,7 +76,11 @@ def update_answer(metrics, prediction, gold):
     metrics["f1"] += f1
     metrics["precision"] += precision
     metrics["recall"] += recall
-    return em, f1, precision, recall
+    
+    gold_list = gold.split("|")
+    hit = eval_hit(prediction, gold_list)
+    
+    return em, f1, precision, recall, hit
 
 
 def update_sp(metrics, prediction, gold):
@@ -116,7 +133,7 @@ def eval(prediction_file, gold_file):
             print("missing answer {}".format(cur_id))
             can_eval_joint = False
         else:
-            em, f1, prec, recall = update_answer(
+            em, f1, prec, recall, hit = update_answer(
                 metrics, prediction["answer"][cur_id], dp["answer"]
             )
         if cur_id not in prediction["sp"]:

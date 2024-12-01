@@ -4,7 +4,12 @@ available_gpus=$3
 syn_thresh=$4
 llm_api=$5 # e.g., 'openai', 'together'
 extraction_type=ner
-num_processes=4
+num_processes=20
+
+
+# 记录总开始时间
+start_time=$(date +%s)
+
 
 #Running Open Information Extraction
 python src/openie_with_retrieval_option_parallel.py --dataset $data --llm $llm_api \
@@ -24,6 +29,8 @@ export PATH=$PATH:/home/wangshu/anaconda3/envs/hipporag/bin
 CUDA_VISIBLE_DEVICES=$available_gpus python src/colbertv2_knn.py --filename output/kb_to_kb.tsv
 CUDA_VISIBLE_DEVICES=$available_gpus python src/colbertv2_knn.py --filename output/query_to_kb.tsv
 
+echo "Finish ColBERT KNN search"
+
 python src/create_graph.py --dataset $data --model_name colbertv2 \
     --extraction_model $extraction_model --threshold $syn_thresh \
     --create_graph --extraction_type $extraction_type --cosine_sim_edges
@@ -33,3 +40,11 @@ CUDA_VISIBLE_DEVICES=$available_gpus python3 src/colbertv2_indexing.py \
     --dataset $data \
     --phrase output/$data'_facts_and_sim_graph_phrase_dict_ents_only_lower_preprocess_ner.v3.subset.p' \
     --corpus 'data/'$data'_corpus.json'
+
+
+# 记录总结束时间
+end_time=$(date +%s)
+total_time=$((end_time - start_time))
+
+# 输出总运行时间
+echo "Total runtime: $total_time seconds"

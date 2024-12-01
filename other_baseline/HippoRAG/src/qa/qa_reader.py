@@ -83,10 +83,14 @@ def qa_read(query: str, passages: list, few_shot: list, client):
     try:
         chat_completion = client.invoke(messages.to_messages())
         response_content = chat_completion.content
+        token_usage = (
+            chat_completion.response_metadata["prompt_eval_count"]
+            + chat_completion.response_metadata["eval_count"]
+        )
     except Exception as e:
         print("QA read exception", e)
         return ""
-    return response_content
+    return response_content, token_usage
 
 
 def parallel_qa_read(
@@ -124,16 +128,17 @@ def parallel_qa_read(
         if args.dataset == "hotpotqa":
             retrieved = [remove_newlines_after_first(item) for item in retrieved]
 
-        response = qa_read(query, retrieved, demos, client)
+        response, token_usage = qa_read(query, retrieved, demos, client)
         try:
             pred_ans = response.split("Answer:")[1].strip()
         except Exception as e:
-            print("Parsing prediction:", e, response)
+            # print("Parsing prediction:", e, response)
+            print("Parsing prediction:", e, sample_idx)
             pred_ans = response
 
         gold_ans = sample["answer"]
         if args.dataset == "hotpotqa":
-            em, f1, precision, recall = update_answer(
+            em, f1, precision, recall, hit = update_answer(
                 {"em": 0, "f1": 0, "precision": 0, "recall": 0}, pred_ans, gold_ans
             )
             return (
@@ -141,11 +146,25 @@ def parallel_qa_read(
                 sample_id,
                 retrieved,
                 pred_ans,
-                {"em": em, "f1": f1, "precision": precision, "recall": recall},
+                {
+                    "em": em,
+                    "f1": f1,
+                    "precision": precision,
+                    "recall": recall,
+                    "hit": hit,
+                },
+                token_usage,
             )
         elif args.dataset == "musique":
             em, f1 = evaluate({"predicted_answer": pred_ans}, sample)
-            return sample_idx, sample_id, retrieved, pred_ans, {"em": em, "f1": f1}
+            return (
+                sample_idx,
+                sample_id,
+                retrieved,
+                pred_ans,
+                {"em": em, "f1": f1},
+                token_usage,
+            )
         elif args.dataset == "2wikimultihopqa":
             em = 1 if exact_match_score(pred_ans, gold_ans) else 0
             f1, precision, recall = f1_score(pred_ans, gold_ans)
@@ -155,6 +174,7 @@ def parallel_qa_read(
                 retrieved,
                 pred_ans,
                 {"em": em, "f1": f1, "precision": precision, "recall": recall},
+                token_usage,
             )
 
     with ThreadPoolExecutor(max_workers=args.thread) as executor:
@@ -162,10 +182,14 @@ def parallel_qa_read(
             executor.submit(process_sample, (sample_idx, sample))
             for sample_idx, sample in enumerate(data)
         ]
+        token_all = 0
         for future in tqdm(as_completed(futures), total=len(futures), desc="QA read"):
             result = future.result()
             if result is not None:
-                sample_idx, sample_id, retrieved, pred_ans, metrics = result
+                sample_idx, sample_id, retrieved, pred_ans, metrics, token_current = (
+                    result
+                )
+                token_all += token_current
                 sample_id_set.add(sample_id)
                 sample = data[sample_idx]
                 sample["retrieved"] = retrieved
@@ -175,8 +199,18 @@ def parallel_qa_read(
                     total_metrics["qa_" + key] += metrics[key]
 
                 if sample_idx % 50 == 0:
+                    metric_str = " ".join(
+                        [
+                            f"{key}: {total_metrics[key] / len(data):.4f}"
+                            for key in total_metrics.keys()
+                        ]
+                    )
+                    print(f"{sample_idx}: {metric_str}")
                     with open(output_path, "w") as f:
                         json.dump(data, f)
+
+    print("QA read finished")
+    print("Total tokens:", token_all)
 
 
 if __name__ == "__main__":
@@ -197,16 +231,16 @@ if __name__ == "__main__":
         help="retriever name to distinguish different experiments",
     )
     parser.add_argument(
-        "--llm", type=str, default="openai", help="LLM, e.g., 'openai' or 'together'"
+        "--llm", type=str, default="ollama", help="LLM, e.g., 'openai' or 'together'"
     )
     parser.add_argument(
         "--llm_model",
         type=str,
-        default="gpt-3.5-turbo-1106",
+        default="llama3.1:8b4k",
         help="Specific model name",
     )
     parser.add_argument(
-        "--num_demo", type=int, default=1, help="the number of few-shot examples"
+        "--num_demo", type=int, default=0, help="the number of few-shot examples"
     )
     parser.add_argument(
         "--num_doc", type=int, default=5, help="the number of in-context documents"
@@ -214,14 +248,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "--thread",
         type=int,
-        default=8,
+        default=20,
         help="the number of workers for parallel processing",
     )
     args = parser.parse_args()
 
+    if not os.path.exists("exp"):
+        os.makedirs("exp")
+
     output_path = f"exp/qa_{args.dataset}_{args.retriever}_{args.llm_model}_demo_{args.num_demo}_doc_{args.num_doc}.json"
     processed_id_set = set()
-    total_metrics = {"qa_em": 0, "qa_f1": 0, "qa_precision": 0, "qa_recall": 0}
+    total_metrics = {
+        "qa_em": 0,
+        "qa_f1": 0,
+        "qa_precision": 0,
+        "qa_recall": 0,
+        "qa_hit": 0,
+    }
     if args.data:
         data = json.load(open(args.data, "r"))
     else:

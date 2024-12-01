@@ -12,6 +12,7 @@ __pycache__/
 data/
 output/
 colbert/
+output*/
 
 # Distribution / packaging
 .Python

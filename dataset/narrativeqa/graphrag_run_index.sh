@@ -5,7 +5,7 @@ train_base_path="/mnt/data/wangshu/hcarag/narrativeqa/data/train"
 export PYTHONPATH="/home/wangshu/rag/4_graphrag/graphrag/:$PYTHONPATH"
 
 # 最大并行任务数
-max_jobs=4
+max_jobs=3
 current_jobs=0
 
 # for i in {530..1101}; do
@@ -30,13 +30,13 @@ current_jobs=0
 # wait
 
 # # 重置当前任务计数
-current_jobs=0
+# current_jobs=0
 
 # 处理 test 数据集
 for i in {0..354}; do
     root_path="${test_base_path}/${i}"
     cd /home/wangshu/rag/4_graphrag/graphrag/
-    graphrag init --root $root_path > "${root_path}/init.log" 2>&1 &
+    graphrag index --root $root_path > "${root_path}/index.log" 2>&1 &
     echo "root_path: ${root_path} finish"
     
     # 增加当前任务计数

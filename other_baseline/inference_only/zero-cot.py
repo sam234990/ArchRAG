@@ -21,11 +21,12 @@ import wandb
 
 def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_args):
     results = []
-
+    all_token = 0
     for i in range(len(dataset_part)):
         data = dataset_part.iloc[i]
         query_content = data["question"] + prompt
-        llm_res = llm_invoker(query_content, args=llm_invoker_args)
+        llm_res, token = llm_invoker(query_content, args=llm_invoker_args)
+        all_token += token
         tmp_res = {
             "id": data["id"],
             "question": data["question"],
@@ -36,7 +37,7 @@ def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_a
         if i % (len(dataset_part) / 3) == 0:
             print(f"Process {process_id}: Processing {i}/{len(dataset_part)}")
 
-    return results
+    return results, all_token
 
 
 def run_zero_cot_llm(
@@ -75,9 +76,12 @@ def run_zero_cot_llm(
             ],
         )
 
-    # 整理返回结果
-    flattened_results = [item for sublist in results for item in sublist]
+    # 整理返回结果和token使用量
+    flattened_results = [item for sublist, _ in results for item in sublist]
+    total_tokens = sum(token for _, token in results)
     results_df = pd.DataFrame(flattened_results)
+
+    print(f"Total tokens used: {total_tokens}")
 
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"{strategy}_{args.engine}.csv")
@@ -165,4 +169,6 @@ if __name__ == "__main__":
     # dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
 
-    run_zero_cot_llm(dataset, strategy, save_dir=save_dir, args=args)
+    run_zero_cot_llm(
+        dataset, strategy, save_dir=save_dir, args=args, num_workers=args.num_workers
+    )

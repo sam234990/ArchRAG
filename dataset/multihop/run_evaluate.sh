@@ -31,9 +31,9 @@ dataset_name="multihop"
 
 # log_file="./eval/usage_evaluate_t${temperature}_${strategy}_${k_each_level}_${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_${response_type}_inv${involve_llm_res}.log"
 python_file="/home/wangshu/rag/hier_graph_rag/src/evaluate/test_qa.py"
-log_file="./eval/usage_evaluate_t${temperature}_${strategy}_${k_each_level}_"\
-"${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_"\
-"${response_type}_inv${involve_llm_res}.log"
+log_file="./eval/usage_evaluate_t${temperature}_${strategy}_${k_each_level}_""\
+${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_""\
+${response_type}_inv${involve_llm_res}.log"
 # 设置PYTHONPATH
 export PYTHONPATH="/home/wangshu/rag/hier_graph_rag/:$PYTHONPATH"
 

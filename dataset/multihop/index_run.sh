@@ -2,7 +2,7 @@ base_path="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag"
 relationship_filename="create_final_relationships.parquet"
 entity_filename="create_final_entities.parquet"
 # output_dir="/mnt/data/wangshu/hcarag/FB15k/hc_index"
-output_dir="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b"
+output_dir="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b4k"
 wx_weight=0.8
 m_du_scale=1
 max_level=6
@@ -11,7 +11,7 @@ max_cluster_size=15
 entity_second_embedding=True
 engine="llama3.1:8b4k"
 
-log_file="./log_index/index_3_${engine}.log"
+log_file="./log_index/index_3_${engine}-token_usage.log"
 python_file="/home/wangshu/rag/hier_graph_rag/src/index.py"
 
 # 设置PYTHONPATH

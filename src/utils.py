@@ -649,7 +649,7 @@ def create_arg_parser():
     parser.add_argument(
         "--embedding_num_workers",
         type=int,
-        default=48,
+        default=32,
         help="Number of workers to use for parallel processing",
     )
 
@@ -663,7 +663,7 @@ def create_arg_parser():
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=28,
+        default=32,
         help="Number of workers to use for parallel processing",
     )
 

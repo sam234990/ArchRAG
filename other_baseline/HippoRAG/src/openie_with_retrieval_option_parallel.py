@@ -148,12 +148,12 @@ if __name__ == "__main__":
     parser.add_argument("--run_ner", action="store_true")
     parser.add_argument("--num_passages", type=str, default="10")
     parser.add_argument(
-        "--llm", type=str, default="openai", help="LLM, e.g., 'openai' or 'together'"
+        "--llm", type=str, default="ollama", help="LLM, e.g., 'openai' or 'together'"
     )
     parser.add_argument(
         "--model_name",
         type=str,
-        default="gpt-3.5-turbo-1106",
+        default="llama3.1:8b4k",
         help="Specific model name",
     )
     parser.add_argument("--num_processes", type=int, default=4)
@@ -326,6 +326,10 @@ if __name__ == "__main__":
         new_json.extend(output[0])
         all_entities.extend(output[1])
         lm_total_tokens += output[2]
+
+    print(
+        f"LLM token total cost in openie_with_retrieval_option_parallel:{lm_total_tokens}"
+    )
 
     if not (already_done):
         avg_ent_chars = np.mean([len(e) for e in all_entities])
