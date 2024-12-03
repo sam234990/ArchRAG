@@ -1,7 +1,7 @@
-dataset_name="hotpot"
-dataset_name="multihop"
+# dataset_name="hotpot"
+# dataset_name="multihop"
 # dataset_name="webq"
-# dataset_name="narrativeqa"
+dataset_name="narrativeqa"
 # dataset_name="mintaka"
 # dataset_name="webqsp"
 

@@ -3,6 +3,12 @@ import pandas as pd
 import re
 import string
 from collections import Counter
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from nltk.tokenize import word_tokenize
+from nltk.translate.meteor_score import meteor_score
+import copy
+import nltk
+from rouge_score import rouge_scorer
 
 
 def get_accuracy_gqa(path):
@@ -117,15 +123,15 @@ def get_accuracy_webqsp_qa(path, pred_col="pred", label_col="label"):
     f1 = sum(f1_list) * 100 / len(f1_list)
     pre = sum(precission_list) * 100 / len(precission_list)
     recall = sum(recall_list) * 100 / len(recall_list)
-    
-    df['acc_' + pred_col] = acc_list
-    df['hit' + pred_col] = hit_list  
-    df['f1' + pred_col] = f1_list
-    df['precision' + pred_col] = precission_list
-    df['recall' + pred_col] = recall_list
-    
+
+    df["acc_" + pred_col] = acc_list
+    df["hit" + pred_col] = hit_list
+    df["f1" + pred_col] = f1_list
+    df["precision" + pred_col] = precission_list
+    df["recall" + pred_col] = recall_list
+
     df.to_csv(path, index=False)
-    
+
     print(f"Accuracy: {acc:.4f}")
     print(f"Hit: {hit:.4f}")
     print(f"Precision: {pre:.4f}")
@@ -210,13 +216,13 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
         prediction = prediction.replace("|", "\n")
         prediction = prediction.split("\n")
         prediction_str = " ".join(prediction)
-        
+
         answer = answer.split("|")
-        if isinstance(answer, list):      
+        if isinstance(answer, list):
             answer_str = " ".join(answer)
         else:
             answer_str = answer
-        
+
         hit = eval_hit(prediction_str, answer)
         hit_list.append(hit)
 
@@ -232,6 +238,14 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
     recall = sum(recall_list) * 100 / len(recall_list)
     em = sum(em_list) * 100 / len(em_list)
 
+    df["hit" + pred_col] = hit_list
+    df["f1" + pred_col] = f1_list
+    df["precision" + pred_col] = precission_list
+    df["recall" + pred_col] = recall_list
+    df["em" + pred_col] = em_list
+
+    df.to_csv(path, index=False)
+
     print(f"Hit: {hit:.4f}")
     print(f"Precision: {pre:.4f}")
     print(f"Recall: {recall:.4f}")
@@ -241,20 +255,215 @@ def get_accuracy_doc_qa(path, pred_col="pred", label_col="label"):
     return hit
 
 
-eval_funcs = {
-    "expla_graphs": get_accuracy_expla_graphs,
-    "scene_graphs": get_accuracy_gqa,
-    "scene_graphs_baseline": get_accuracy_gqa,
-    "webqsp": get_accuracy_webqsp_qa,
-    "webqsp_baseline": get_accuracy_webqsp_qa,
-}
+""" Evaluation script for NarrativeQA dataset. (Extracted from the official evaluation script) """
+
+nltk_path = "/mnt/data/wangshu/hcarag/nltk"
+# 添加 NLTK 数据路径
+nltk.data.path.append(nltk_path)
+
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    print("Downloading punkt")
+    nltk.download("punkt", download_dir=nltk_path)
+    nltk.download("wordnet", download_dir=nltk_path)
+
+
+def bleu_1(p, g):
+    return sentence_bleu(g, p, weights=(1, 0, 0, 0))
+
+
+def bleu_4(p, g):
+    return sentence_bleu(g, p, weights=(0, 0, 0, 1))
+
+
+def bleu_4_modify(p, g):
+    return sentence_bleu(g, p, weights=(0.25, 0.25, 0.25, 0.25))
+
+
+def bleu_1_smooth(p, g):
+    return sentence_bleu(
+        g, p, weights=(1, 0, 0, 0), smoothing_function=SmoothingFunction().method1
+    )
+
+
+def bleu_4_smooth(p, g):
+    return sentence_bleu(
+        g, p, weights=(0, 0, 0, 1), smoothing_function=SmoothingFunction().method1
+    )
+
+
+def bleu_4_modify_smooth(p, g):
+    return sentence_bleu(
+        g,
+        p,
+        weights=(0.25, 0.25, 0.25, 0.25),
+        smoothing_function=SmoothingFunction().method1,
+    )
+
+
+def meteor(p, g):
+    return meteor_score([x.split() for x in g], p.split())
+
+
+# 创建 RougeScorer 实例，设置 ROUGE-L 指标
+scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
+
+
+# 计算 ROUGE-L 分数
+def rouge_l(p, g):
+    if isinstance(g, list):
+        g = g[0]
+
+    return scorer.score(g, p)  # g: ground truth, p: prediction
+
+
+def metric_max_over_ground_truths(metric_fn, prediction, ground_truths, tokenize=False):
+    scores_for_ground_truths = []
+    for ground_truth in ground_truths:
+        if tokenize:
+            score = metric_fn(word_tokenize(prediction), [word_tokenize(ground_truth)])
+        else:
+            score = metric_fn(prediction, [ground_truth])
+        scores_for_ground_truths.append(score)
+    if isinstance(score, dict) and "rougeL" in score:
+        rouge_l_score = {"rouge_l f1": 0, "rouge_l precision": 0, "rouge_l recall": 0}
+        rouge_l_score["rouge_l f1"] = max(
+            [score["rougeL"].fmeasure for score in scores_for_ground_truths]
+        )
+        rouge_l_score["rouge_l precision"] = max(
+            [score["rougeL"].precision for score in scores_for_ground_truths]
+        )
+        rouge_l_score["rouge_l recall"] = max(
+            [score["rougeL"].recall for score in scores_for_ground_truths]
+        )
+
+        return rouge_l_score
+    else:
+        return round(max(scores_for_ground_truths), 2)
+
+
+def get_metric_score(prediction, ground_truths):
+    bleu_1_score = metric_max_over_ground_truths(
+        bleu_1, prediction, ground_truths, tokenize=True
+    )
+    bleu_4_score = metric_max_over_ground_truths(
+        bleu_4, prediction, ground_truths, tokenize=True
+    )
+    modify_bleu_4_score = metric_max_over_ground_truths(
+        bleu_4_modify, prediction, ground_truths, tokenize=True
+    )
+    bleu_1_smooth_score = metric_max_over_ground_truths(
+        bleu_1_smooth, prediction, ground_truths, tokenize=True
+    )
+    bleu_4_smooth_score = metric_max_over_ground_truths(
+        bleu_4_smooth, prediction, ground_truths, tokenize=True
+    )
+    modify_bleu_4_smooth_score = metric_max_over_ground_truths(
+        bleu_4_modify_smooth, prediction, ground_truths, tokenize=True
+    )
+    meteor_score = metric_max_over_ground_truths(
+        meteor, prediction, ground_truths, tokenize=False
+    )
+    rouge_l_score = metric_max_over_ground_truths(
+        rouge_l, prediction, ground_truths, tokenize=False
+    )
+
+    return {
+        "bleu_1": bleu_1_score,
+        "bleu_4": bleu_4_score,
+        "modify_bleu_4": modify_bleu_4_score,
+        "bleu_1_smooth": bleu_1_smooth_score,
+        "bleu_4_smooth": bleu_4_smooth_score,
+        "modify_bleu_4_smooth": modify_bleu_4_smooth_score,
+        "meteor": meteor_score,
+        "rouge_l f1": rouge_l_score["rouge_l f1"],
+        "rouge_l precision": rouge_l_score["rouge_l precision"],
+        "rouge_l recall": rouge_l_score["rouge_l recall"],
+    }
+
+
+def get_blue_doc_qa(path, pred_col="pred", label_col="label"):
+    df = pd.read_csv(path, na_filter=False)
+
+    label_list, pred_list = get_label_pred_list(df, pred_col, label_col)
+
+    # Load results
+    blue_1_list = []
+    blue_4_list = []
+    modify_blue_4_list = []
+    bleu_1_smooth_list = []
+    bleu_4_smooth_list = []
+    modify_bleu_4_smooth_list = []
+    meteor_list = []
+    rouge_l_f1_list = []
+    rouge_l_precision_list = []
+    rouge_l_recall_list = []
+
+    for prediction, answer in zip(pred_list, label_list):
+
+        prediction = prediction.replace("|", "\n")
+        prediction = prediction.split("\n")
+        prediction_str = " ".join(prediction)
+
+        answer = answer.split("|")
+
+        metrics_res = get_metric_score(prediction_str, answer)
+        blue_1_list.append(metrics_res["bleu_1"])
+        blue_4_list.append(metrics_res["bleu_4"])
+        modify_blue_4_list.append(metrics_res["modify_bleu_4"])
+        bleu_1_smooth_list.append(metrics_res["bleu_1_smooth"])
+        bleu_4_smooth_list.append(metrics_res["bleu_4_smooth"])
+        modify_bleu_4_smooth_list.append(metrics_res["modify_bleu_4_smooth"])
+        meteor_list.append(metrics_res["meteor"])
+        rouge_l_f1_list.append(metrics_res["rouge_l f1"])
+        rouge_l_precision_list.append(metrics_res["rouge_l precision"])
+        rouge_l_recall_list.append(metrics_res["rouge_l recall"])
+
+    blue_1 = sum(blue_1_list) * 100 / len(blue_1_list)
+    blue_4 = sum(blue_4_list) * 100 / len(blue_4_list)
+    modify_blue_4 = sum(modify_blue_4_list) * 100 / len(modify_blue_4_list)
+    bleu_1_smooth = sum(bleu_1_smooth_list) * 100 / len(bleu_1_smooth_list)
+    bleu_4_smooth = sum(bleu_4_smooth_list) * 100 / len(bleu_4_smooth_list)
+    modify_bleu_4_smooth = sum(modify_bleu_4_smooth_list) * 100 / len(modify_bleu_4_smooth_list)
+    meteor = sum(meteor_list) * 100 / len(meteor_list)
+    rouge_l_f1 = sum(rouge_l_f1_list) * 100 / len(rouge_l_f1_list)
+    rouge_l_precision = sum(rouge_l_precision_list) * 100 / len(rouge_l_precision_list)
+    rouge_l_recall = sum(rouge_l_recall_list) * 100 / len(rouge_l_recall_list)
+
+    df["blue_1" + pred_col] = blue_1_list
+    df["blue_4" + pred_col] = blue_4_list
+    df["modify_blue_4" + pred_col] = modify_blue_4_list
+    df["bleu_1_smooth" + pred_col] = bleu_1_smooth_list
+    df["bleu_4_smooth" + pred_col] = bleu_4_smooth_list
+    df["modify_bleu_4_smooth" + pred_col] = modify_bleu_4_smooth_list
+    df["meteor" + pred_col] = meteor_list
+    df["rouge_l_f1" + pred_col] = rouge_l_f1_list
+    df["rouge_l_precision" + pred_col] = rouge_l_precision_list
+    df["rouge_l_recall" + pred_col] = rouge_l_recall_list
+
+    df.to_csv(path, index=False)
+
+    print(f"Blue-1: {blue_1:.4f}")
+    print(f"Blue-4: {blue_4:.4f}")
+    print(f"Modify Blue-4: {modify_blue_4:.4f}")
+    print(f"Blue-1 Smooth: {bleu_1_smooth:.4f}")
+    print(f"Blue-4 Smooth: {bleu_4_smooth:.4f}")
+    print(f"Modify Blue-4 Smooth: {modify_bleu_4_smooth:.4f}")
+    print(f"Meteor: {meteor:.4f}")
+    print(f"Rouge-l F1: {rouge_l_f1:.4f}")
+    print(f"Rouge-l Precision: {rouge_l_precision:.4f}")
+    print(f"Rouge-l Recall: {rouge_l_recall:.4f}")
+
+    return blue_1
+
 
 dataset_name_path = {
     "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/webqa.json",
     "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
-    "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa.json",
+    "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa.json",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/webqsp_qa.json",
 }
 
@@ -263,7 +472,7 @@ baseline_save_path_dict = {
     "webq": "/mnt/data/wangshu/hcarag/FB15k/webqa/baseline",
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
-    "narrativeqa":"/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
+    "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/baseline",
 }
 

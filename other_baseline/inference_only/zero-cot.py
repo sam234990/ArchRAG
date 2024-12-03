@@ -44,7 +44,7 @@ def run_zero_cot_llm(
     dataset: pd.DataFrame, strategy, save_dir, args=None, num_workers=12
 ):
     if args.debug_flag:
-        dataset = dataset.iloc[:100]
+        dataset = dataset.iloc[:20]
     print(f"Running {strategy} strategy")
 
     wandb.init(
@@ -89,18 +89,23 @@ def run_zero_cot_llm(
     print(f"Saving results to {save_path}")
 
     results_df.to_csv(save_path, index=False)
-    eval_res(save_path=save_path, eval_mode=args.eval_mode)
+    eval_res(save_path=save_path, eval_mode=args.eval_mode, args=args)
 
 
-def eval_res(save_path, eval_mode):
+def eval_res(save_path, eval_mode, args=None):
     if eval_mode == "KGQA":
         hit = get_accuracy_webqsp_qa(save_path)
         print(f"Test Hit : {hit}")
+        wandb.log({"Test Hit": hit})
     elif eval_mode == "DocQA":
-        hit = get_accuracy_doc_qa(save_path)
-        print(f"Test Hit : {hit}")
-
-    wandb.log({"Test Hit": hit})
+        if args.dataset_name != "narrativeqa":
+            hit = get_accuracy_doc_qa(save_path)
+            print(f"Test Hit : {hit}")
+            wandb.log({"Test Hit": hit})
+        else:
+            Blue_1 = get_blue_doc_qa(save_path)
+            print(f"Test Blue_1 : {Blue_1}")
+            wandb.log({"Test Blue_1": Blue_1})
 
 
 class Args:
@@ -119,7 +124,7 @@ if __name__ == "__main__":
         "--dataset_name",
         type=str,
         choices=dataset_name_path.keys(),  # 只允许选择这两个数据集
-        default="mintaka",
+        default="narrativeqa",
         help=f"Select the dataset name. Options are: {' '.join(dataset_name_path.keys())}",
     )
 
@@ -133,7 +138,7 @@ if __name__ == "__main__":
         "--eval_mode",
         type=str,
         choices=["KGQA", "DocQA"],
-        default="KGQA",
+        default="DocQA",
         help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
     )
 
