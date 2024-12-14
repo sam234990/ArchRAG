@@ -697,21 +697,21 @@ def create_inference_arg_parser():
         "--base_path",
         type=str,
         # required=True,
-        default="/mnt/data/wangshu/hcarag/FB15k/KG",
+        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag",
         help="Base path to the directory containing the graph data.",
     )
 
     parser.add_argument(
         "--relationship_filename",
         type=str,
-        default="relationships.csv",
+        default="create_final_relationships.parquet",
         help="Filename for the relationship data.",
     )
 
     parser.add_argument(
         "--entity_filename",
         type=str,
-        default="entity_df.csv",
+        default="create_final_entities.parquet",
         help="Filename for the entity data.",
     )
 
@@ -719,7 +719,7 @@ def create_inference_arg_parser():
         "--output_dir",
         type=str,
         # required=True,
-        default="/mnt/data/wangshu/hcarag/FB15k/hc_index_8b",
+        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b4k",
         help="Output dir path for index",
     )
 
@@ -728,15 +728,22 @@ def create_inference_arg_parser():
         "--dataset_name",
         type=str,
         # required=True,
-        default="webq",
+        default="hotpot",
         help="Dataset name for evaluation",
+    )
+
+    parser.add_argument(
+        "--doc_idx",
+        type=int,
+        default=-1,
+        help="Index of the document to be used [Only for narrative QA]",
     )
 
     parser.add_argument(
         "--eval_mode",
         type=str,
         choices=["KGQA", "DocQA"],
-        default="KGQA",
+        default="DocQA",
         help="Evaluation mode for the dataset:['KGQA', 'DocQA']",
     )
 
@@ -913,10 +920,17 @@ def create_inference_arg_parser():
     )
 
     parser.add_argument(
+        "--topk_chunk",
+        type=int,
+        default=0,
+        help="Use topk retrieval chunks, 0 for not retrieval",
+    )
+
+    parser.add_argument(
         "--generate_strategy",
         type=str,
-        default="direct",
-        help="Strategy for generation",
+        default="mr",
+        help='Strategy for generation ["direct", "mr"]',
     )
 
     parser.add_argument(

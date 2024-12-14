@@ -667,6 +667,11 @@ The following is the result obtained through LLM reasoning. Please reference any
 {llm_res}
 """
 
+CHUNK_RETREIVAL_PROMPT = """
+The following is the result obtained through chunk retrieval. Please reference any useful information from this section.
+{chunk_res}
+"""
+
 
 GLOBAL_REDUCE_SYSTEM_PROMPT = """
 ---Role---

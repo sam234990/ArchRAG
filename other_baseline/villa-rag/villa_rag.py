@@ -13,6 +13,7 @@ os.environ["https_proxy"] = "http://127.0.0.1:7892"
 from src.llm import llm_invoker
 from src.lm_emb import openai_embedding
 from src.evaluate.evaluate import *
+from src.inference import load_villa_index
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -110,7 +111,7 @@ Answer: """
     print(f"Total tokens used: {total_tokens}")
 
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"villa_rag_{args.engine}_topk{topk}.csv")
+    save_path = os.path.join(save_dir, f"villa_rag_{args.engine}_top{topk}.csv")
 
     print(f"Saving results to {save_path}")
 
@@ -124,7 +125,8 @@ def eval_res(save_path, eval_mode, args=None):
         print(f"Test Hit : {hit}")
         wandb.log({"Test Hit": hit})
     elif eval_mode == "DocQA":
-        if args.dataset_name != "narrativeqa":
+        if not ("narrative" in args.dataset_name):
+            # if args.dataset_name != "narrativeqa":
             hit = get_accuracy_doc_qa(save_path)
             print(f"Test Hit : {hit}")
             wandb.log({"Test Hit": hit})
@@ -145,20 +147,6 @@ class Args:
         self.embedding_model = "nomic-embed-text"
 
 
-def load_index(dataset_name):
-
-    corpus_path = {
-        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.json",
-        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.json",
-    }
-    index_path = {
-        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.index",
-        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.index",
-    }
-
-    index = faiss.read_index(index_path[dataset_name])
-    corpus = pd.read_json(corpus_path[dataset_name], lines=True, orient="records")
-    return index, corpus
 
 
 if __name__ == "__main__":
@@ -173,7 +161,14 @@ if __name__ == "__main__":
         default="hotpot",
         help=f"Select the dataset name. Options are: {' '.join(dataset_name_path.keys())}",
     )
-
+    
+    parser.add_argument(
+        "--doc_idx",
+        type=int,
+        default=-1,
+        help="Index of the document to be used [Only for narrative QA]",
+    )
+    
     parser.add_argument(
         "--eval_mode",
         type=str,
@@ -214,13 +209,16 @@ if __name__ == "__main__":
 
     dataset_path = dataset_name_path[args.dataset_name]
     save_dir = baseline_save_path_dict[args.dataset_name]
+    if "narrative" in args.dataset_name:
+        dataset_path = dataset_path.format(doc_idx=args.doc_idx)
+        save_dir = save_dir.format(doc_idx=args.doc_idx)
 
     # Read dataset
     dataset = pd.read_json(dataset_path, lines=True, orient="records")
     # dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
 
-    index, corpus = load_index(args.dataset_name)
+    index, corpus = load_villa_index(args=args)
 
     rag_llm(
         dataset=dataset,

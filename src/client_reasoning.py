@@ -34,7 +34,7 @@ def problem_reasoning(
     retry = 0
     success = False
     all_token = 0
-    
+
     while not success and retry < max_retries:
         reason_level, cur_token = llm_invoker(infer_content, args, json=True)
         all_token += cur_token
@@ -193,8 +193,10 @@ def generate_level_summary(content, max_retries, args):
     all_token = 0
 
     while not success and retries < max_retries:
-        raw_result, cur_token = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
-        all_token+= cur_token
+        raw_result, cur_token = llm_invoker(
+            content, args, max_tokens=args.max_tokens, json=True
+        )
+        all_token += cur_token
         try:
             output = json.loads(raw_result)
             if "summary" in output:
@@ -220,7 +222,9 @@ def level_summary(community_df, max_level, args):
         level_content = prep_level_content(
             level, max_level, community_df, sample_size=3, max_tokens=args.max_tokens
         )
-        report, cur_token = generate_level_summary(level_content, args.max_retries, args)
+        report, cur_token = generate_level_summary(
+            level_content, args.max_retries, args
+        )
         all_token += cur_token
         report["level"] = level
         level_comunity_number = community_df[community_df["level"] == level].shape[0]
@@ -404,13 +408,49 @@ def prep_map_content(
     return all_chunks
 
 
+def prep_df_prompt_content(
+    input_df: pd.DataFrame, sel_columns: list, max_tokens: int = 4096
+) -> str:
+    prompt_list = []
+    header = ", ".join(sel_columns) + "\n"
+    current_prompt = header
+    # for _, row in input_df.iterrows():
+    i = 0
+    while i < len(input_df):
+        row = input_df.iloc[i]
+        row_content = ", ".join([str(row[col]) for col in sel_columns])
+        if num_tokens(current_prompt + row_content) > max_tokens:
+            if len(current_prompt) == len(header):
+                # single row exceeds max_tokens
+                prompt = current_prompt + row_content
+                while num_tokens(prompt) > max_tokens:
+                    prompt = prompt[:-1]
+                prompt_list.append(prompt)
+                current_prompt = header
+                i += 1
+            else:
+                # multiple rows exceed max_tokens
+                prompt_list.append(current_prompt)
+                current_prompt = header
+        else:
+            # not exceed max_tokens
+            current_prompt += row_content + "\n"
+            i += 1
+    if len(current_prompt) > 0:
+        prompt_list.append(current_prompt)
+    
+    return prompt_list
+
+
 def map_llm_worker(content, args) -> Tuple[list[Dict[str, Any]], int]:
     retries = 0
     points_data = []  # List to hold the descriptions and scores
     all_token = 0
-    
+
     while retries < args.max_retries:
-        raw_result, cur_token = llm_invoker(content, args, max_tokens=args.max_tokens, json=True)
+        raw_result, cur_token = llm_invoker(
+            content, args, max_tokens=args.max_tokens, json=True
+        )
         all_token += cur_token
         output, json_output = try_parse_json_object(raw_result or "")
 
@@ -447,6 +487,7 @@ def map_inference(
     relation_df,
     community_df,
     llm_res,
+    topk_chunk,
     query,
     args,
     query_paras,
@@ -462,8 +503,28 @@ def map_inference(
     if query_paras["involve_llm_res"] is True:
         llm_res_content = LLM_RES_PROMPT.format(llm_res=llm_res)
         all_chunks = [
-            GLOBAL_MAP_SYSTEM_PROMPT.format(context_data=llm_res_content, user_query=query)
+            GLOBAL_MAP_SYSTEM_PROMPT.format(
+                context_data=llm_res_content, user_query=query
+            )
         ] + all_chunks
+
+    if query_paras["topk_chunk"] > 0:
+        chunk_prompt_token = (
+            num_tokens(CHUNK_RETREIVAL_PROMPT)
+            + num_tokens(GLOBAL_MAP_SYSTEM_PROMPT)
+            + num_tokens(query)
+        )
+        chunk_list = prep_df_prompt_content(
+            topk_chunk, ["title", "content"], args.max_tokens - chunk_prompt_token
+        )
+        chunk_list = [
+            CHUNK_RETREIVAL_PROMPT.format(chunk_res=chunk) for chunk in chunk_list
+        ]
+        chunk_list = [
+            GLOBAL_MAP_SYSTEM_PROMPT.format(context_data=chunk, user_query=query)
+            for chunk in chunk_list
+        ]
+        all_chunks = chunk_list + all_chunks
 
     if parallel_flag == False:
         all_result = []

@@ -11,35 +11,35 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def hcarag(
     query_content,
-    hc_index: faiss.IndexHCHNSWFlat,
-    entity_df,
-    community_df,
-    level_summary_df,
-    relation_df,
+    index_dict,
     query_paras,
-    graph,
     args,
 ):
     all_token = 0
-    topk_entity, topk_community, topk_related_r, token_used = hcarag_retrieval(
+
+    retrieval_dict, token_used = hcarag_retrieval(
         query_content=query_content,
-        hc_index=hc_index,
-        entity_df=entity_df,
-        community_df=community_df,
-        level_summary_df=level_summary_df,
-        relation_df=relation_df,
+        hc_index=index_dict["hc_index"],
+        entity_df=index_dict["entity_df"],
+        community_df=index_dict["community_df"],
+        level_summary_df=index_dict["level_summary_df"],
+        relation_df=index_dict["relation_df"],
         query_paras=query_paras,
-        graph=graph,
+        villa_index=index_dict["villa_index"],
+        chunk_df=index_dict["chunk_df"],
+        graph=index_dict["graph"],
         args=args,
     )
+
     all_token += token_used
     response_report, total_token = hcarag_inference(
-        topk_entity,
-        topk_community,
-        topk_related_r,
-        query_content,
-        args.max_retries,
-        args,
+        topk_entity=retrieval_dict["topk_entity"],
+        topk_community=retrieval_dict["topk_community"],
+        topk_related_r=retrieval_dict["topk_related_r"],
+        topk_chunk=retrieval_dict["topk_chunk"],
+        query=query_content,
+        max_retries=args.max_retries,
+        args=args,
         query_paras=query_paras,
     )
     all_token += total_token
@@ -67,6 +67,8 @@ def hcarag_retrieval(
     community_df,
     level_summary_df,
     relation_df,
+    villa_index,
+    chunk_df,
     query_paras,
     graph,
     args,
@@ -151,8 +153,22 @@ def hcarag_retrieval(
             query_embedding, sel_r_df, topk=query_paras["topk_e"]
         )
 
+    retrieval_dict = {
+        "topk_entity": topk_entity,
+        "topk_community": topk_community,
+        "topk_related_r": topk_related_r,
+        "topk_chunk": None,
+    }
+
+    if query_paras["topk_chunk"] > 0:
+        topk = query_paras["topk_chunk"]
+        _, pred = villa_index.search(query_embedding, topk)
+        retrieval_context_idx = preds.flatten()
+        topk_chunk_df = chunk_df.iloc[retrieval_context_idx]
+        retrieval_dict["topk_chunk"] = topk_chunk_df
+
     if query_paras["ppr_refine"] is False:
-        return topk_entity, topk_community, topk_related_r, token_used
+        return retrieval_dict, token_used
     else:
 
         # 从 topk_entity 获取 ppr 所需的 personalization 信息
@@ -191,11 +207,22 @@ def hcarag_retrieval(
                 query_embedding, ppr_sel_r_df, topk=query_paras["topk_e"]
             )
 
-        return ppr_topk_entity, topk_community, ppr_topk_related_r, token_used
+        retrieval_dict["topk_entity"] = ppr_topk_entity
+        retrieval_dict["topk_related_r"] = ppr_topk_related_r
+
+        return retrieval_dict, token_used
+        # return ppr_topk_entity, topk_community, ppr_topk_related_r, token_used
 
 
 def hcarag_inference(
-    topk_entity, topk_community, topk_related_r, query, max_retries, args, query_paras
+    topk_entity,
+    topk_community,
+    topk_related_r,
+    topk_chunk,
+    query,
+    max_retries,
+    args,
+    query_paras,
 ):
     if query_paras["generate_strategy"] == "direct":
         response_report, total_token = hcarag_inference_direct(
@@ -212,6 +239,7 @@ def hcarag_inference(
             topk_entity,
             topk_community,
             topk_related_r,
+            topk_chunk,
             query,
             query_paras,
             args,
@@ -266,32 +294,34 @@ def hcarag_inference_mr(
     topk_entity,
     topk_community,
     topk_related_r,
+    topk_chunk,
     query,
     query_paras,
     args,
 ):
     all_token = 0
-    
+
     llm_query_content = query + "\nLet’s think step by step. \n Answer: "
     llm_res, cur_token = llm_invoker(
         llm_query_content, args=args, max_tokens=args.max_tokens, json=False
     )
     all_token += cur_token
-    
+
     map_res_df, cur_token_map = map_inference(
         entity_df=topk_entity,
         community_df=topk_community,
         relation_df=topk_related_r,
         llm_res=llm_res,
+        topk_chunk=topk_chunk,
         query=query,
         query_paras=query_paras,
         args=args,
     )
     all_token += cur_token_map
-    
+
     response_report, cur_token_reduce = reduce_inference(map_res_df, query, args)
     all_token += cur_token_reduce
-    
+
     return response_report, all_token
 
 
@@ -399,29 +429,67 @@ def load_index(args):
     )
 
     relation_df["embedding"] = relation_df["embedding_idx"].map(idx_embed_map)
+        
+
+    villa_index, chunk_df = load_villa_index(args)
+
+    graph, _, _ = read_graph_nx(
+        file_path=args.base_path,
+        entity_filename=args.entity_filename,
+        relationship_filename=args.relationship_filename,
+    )
+
+    index_dict = {
+        "hc_index": hc_index,
+        "entity_df": entity_df,
+        "community_df": community_df,
+        "level_summary_df": level_summary_df,
+        "relation_df": relation_df,
+        "villa_index": villa_index,
+        "chunk_df": chunk_df,
+        "graph": graph,
+    }
+    
     print("Index loaded successfully.")
-    return hc_index, entity_df, community_df, level_summary_df, relation_df
+    
+    # return hc_index, entity_df, community_df, level_summary_df, relation_df
+    return index_dict
+
+
+def load_villa_index(args):
+    dataset_name = args.dataset_name
+    corpus_path = {
+        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.json",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.json",
+        "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/corpus_chunk.json",
+        "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/corpus_chunk.json",
+    }
+    index_path = {
+        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.index",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.index",
+        "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
+        "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
+    }
+
+    index_file = index_path[dataset_name]
+    corpus_file = corpus_path[dataset_name]
+    if "narrativeqa" in dataset_name:
+        doc_idx = args.doc_idx
+        index_file = index_file.format(doc_idx=doc_idx)
+        corpus_file = corpus_file.format(doc_idx=doc_idx)
+
+    index = faiss.read_index(index_file)
+    corpus = pd.read_json(corpus_file, lines=True, orient="records")
+    return index, corpus
 
 
 if __name__ == "__main__":
     parser = create_inference_arg_parser()
     args = parser.parse_args()
 
-    graph, entities_df, final_relationships = read_graph_nx(
-        file_path=args.base_path,
-        entity_filename=args.entity_filename,
-        relationship_filename=args.relationship_filename,
-    )
-
-    hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
-    # test_question = "What is the usage and value of TLB in an Operating System?"
-    test_question = "what does jamaican people speak?"
-    # query_paras = {
-    #     "strategy": "global",
-    #     "k_each_level": 5,
-    #     "k_final": 10,
-    #     "all_k_inference": 2,
-    # }
+    index_dict = load_index(args)
+# {"question":"What relationship does Fred Gehrke have to the 23rd overall pick in the 2010 Major League Baseball Draft?","answers":"great-grandfather","label":"great-grandfather"}
+    test_question = "What relationship does Fred Gehrke have to the 23rd overall pick in the 2010 Major League Baseball Draft?"
     query_paras = {
         "strategy": "global",
         "only_entity": args.only_entity,
@@ -431,20 +499,15 @@ if __name__ == "__main__":
         "all_k_inference": 15,
         "ppr_refine": args.ppr_refine,
         "generate_strategy": "mr",
-        # "generate_strategy": "direct",
         "response_type": "QA",
         "involve_llm_res": True,
+        "topk_chunk": args.topk_chunk,
     }
     response, total_token = hcarag(
-        test_question,
-        hc_index,
-        entity_df,
-        community_df,
-        level_summary_df,
-        relation_df,
-        query_paras,
-        graph,
-        args,
+        query_content=test_question,
+        index_dict=index_dict,
+        query_paras=query_paras,
+        args=args,
     )
     print(response["raw_result"])
     print(response["pred"])

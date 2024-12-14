@@ -26,13 +26,8 @@ def load_datasets(datasets_path) -> pd.DataFrame:
 def process_question(
     idx,
     row,
-    hc_index,
-    entity_df,
-    community_df,
-    level_summary_df,
-    relation_df,
+    index_dict,
     query_paras,
-    graph,
     args,
 ):
     question = row["question"]
@@ -41,13 +36,8 @@ def process_question(
     try:
         response_report, total_token = hcarag(
             query_content=question,
-            hc_index=hc_index,
-            entity_df=entity_df,
-            community_df=community_df,
-            level_summary_df=level_summary_df,
-            relation_df=relation_df,
+            index_dict=index_dict,
             query_paras=query_paras,
-            graph=graph,
             args=args,
         )
         return idx, response_report, total_token
@@ -65,15 +55,12 @@ def test_qa(query_paras, args):
     )
 
     # 1. load dataset and index
-    hc_index, entity_df, community_df, level_summary_df, relation_df = load_index(args)
-
-    graph, _, _ = read_graph_nx(
-        file_path=args.base_path,
-        entity_filename=args.entity_filename,
-        relationship_filename=args.relationship_filename,
-    )
+    index_dict = load_index(args)
 
     dataset_path = dataset_name_path[args.dataset_name]
+    if "narrative" in args.dataset_name:
+        dataset_path = dataset_path.format(doc_idx=args.doc_idx)
+
     qa_df = load_datasets(dataset_path)
 
     # 重置索引，确保连续性
@@ -82,15 +69,7 @@ def test_qa(query_paras, args):
     DEBUG_FLAG = args.debug_flag
     qa_df = qa_df.iloc[:10] if DEBUG_FLAG else qa_df
 
-    save_file_str = (
-        f"{query_paras['strategy']}_"
-        f"{query_paras['k_each_level']}_"
-        f"{query_paras['k_final']}_"
-        f"{query_paras['topk_e']}_"
-        f"{query_paras['all_k_inference']}_"
-        f"{query_paras['generate_strategy']}_"
-        f"{query_paras['response_type']}_"
-    )
+    save_file_str = "_".join([str(value) for value in query_paras.values()])
     save_file_str += ".csv"
     inference_output_dir = args.output_dir + "/qa"
     os.makedirs(inference_output_dir, exist_ok=True)
@@ -99,7 +78,7 @@ def test_qa(query_paras, args):
 
     print_args(query_paras, "Query Parameters:")
 
-    number_works = args.num_workers if not DEBUG_FLAG else 1
+    number_works = args.num_workers if not DEBUG_FLAG else 2
     print(f"Number of workers: {number_works}")
     print(f"Number of questions: {len(qa_df)}")
     print(f"Number of questions per process: {len(qa_df) / number_works}")
@@ -111,13 +90,8 @@ def test_qa(query_paras, args):
         # 准备每个问题的输入参数
         process_func = partial(
             process_question,
-            hc_index=hc_index,
-            entity_df=entity_df,
-            community_df=community_df,
-            level_summary_df=level_summary_df,
-            relation_df=relation_df,
+            index_dict=index_dict,
             query_paras=query_paras,
-            graph=graph,
             args=args,
         )
 
@@ -158,16 +132,25 @@ def eval_inference(prediction_path, args):
         print("Test Raw Result")
         acc_raw = get_accuracy_webqsp_qa(prediction_path, pred_col="raw_result")
         print(f"Test Hit Raw {acc_raw}")
+        wandb.log({"Test Acc": acc_raw})
     elif args.eval_mode == "DocQA":
-        hit = get_accuracy_doc_qa(prediction_path)
-        print(f"Test Hit {hit}")
+        if "narrative" in args.dataset_name:
+            Blue_1 = get_bleu_doc_qa(prediction_path)
+            print(f"Test Blue_1 {Blue_1}")
+            print("-" * 30)
+            print("Test Raw Result")
+            Blue_1_raw = get_bleu_doc_qa(prediction_path, pred_col="raw_result")
+            print(f"Test Hit Blue_1 {Blue_1_raw}")
+            wandb.log({"Test Blue_1": acc_raw})
+        else:
+            hit = get_accuracy_doc_qa(prediction_path)
+            print(f"Test Hit {hit}")
 
-        print("-" * 30)
-        print("Test Raw Result")
-        acc_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
-        print(f"Test Hit Raw {acc_raw}")
-
-    wandb.log({"Test Acc": acc_raw})
+            print("-" * 30)
+            print("Test Raw Result")
+            acc_raw = get_accuracy_doc_qa(prediction_path, pred_col="raw_result")
+            print(f"Test Hit Raw {acc_raw}")
+            wandb.log({"Test Acc": acc_raw})
 
 
 def process_retrieval(
@@ -318,6 +301,7 @@ if __name__ == "__main__":
         "generate_strategy": args.generate_strategy,
         "response_type": args.response_type,
         "involve_llm_res": args.involve_llm_res,
+        "topk_chunk": args.topk_chunk,
     }
     # query_paras = {
     #     "strategy": "global",
