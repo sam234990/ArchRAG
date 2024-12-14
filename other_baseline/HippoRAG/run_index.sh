@@ -1,5 +1,5 @@
-# DATA=sample
-DATA=hotpotqa
+DATA=multihop
+# DATA=hotpotqa
 LLM=llama3.1:8b4k
 SYNONYM_THRESH=0.8
 GPUS=0

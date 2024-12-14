@@ -6,7 +6,7 @@
 import argparse
 from enum import Enum
 
-from .cli import run_global_search, run_local_search, docqa_global_search
+from .cli import run_global_search, run_local_search, docqa_global_search, docqa_local_search
 
 INVALID_METHOD_ERROR = "Invalid method"
 
@@ -17,6 +17,7 @@ class SearchType(Enum):
     LOCAL = "local"
     GLOBAL = "global"
     DOCQA = "docqa"
+    LOCALDOCQA = "localdocqa"
 
     def __str__(self):
         """Return the string representation of the enum value."""
@@ -117,6 +118,16 @@ if __name__ == "__main__":
             )
         case SearchType.DOCQA:
             docqa_global_search(
+                args.config,
+                args.data,
+                args.root,
+                args.community_level,
+                args.response_type,
+                args.dataset_name,
+                args.max_concurrent,
+            )
+        case SearchType.LOCALDOCQA:
+            docqa_local_search(
                 args.config,
                 args.data,
                 args.root,

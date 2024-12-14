@@ -189,4 +189,4 @@ async def local_search(
 
     result = await search_engine.asearch(query=query)
     reporter.success(f"Local Search Response: {result.response}")
-    return result.response
+    return result.response, result.prompt_tokens

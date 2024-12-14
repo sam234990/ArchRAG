@@ -26,7 +26,7 @@ from graphrag.query.llm.oai.typing import (
 )
 from graphrag.query.llm.text_utils import chunk_text
 from graphrag.query.progress import StatusReporter
-
+import ollama
 
 class OpenAIEmbedding(BaseTextEmbedding, OpenAILLMImpl):
     """Wrapper for OpenAI Embedding models."""
@@ -82,9 +82,10 @@ class OpenAIEmbedding(BaseTextEmbedding, OpenAILLMImpl):
         chunk_lens = []
         for chunk in token_chunks:
             try:
-                embedding, chunk_len = self._embed_with_retry(chunk, **kwargs)
+                # embedding, chunk_len = self._embed_with_retry(chunk, **kwargs)
+                embedding = ollama.embeddings(model="nomic-embed-text", prompt=chunk)['embedding']
                 chunk_embeddings.append(embedding)
-                chunk_lens.append(chunk_len)
+                # chunk_lens.append(chunk_len)
             # TODO: catch a more specific exception
             except Exception as e:  # noqa BLE001
                 self._reporter.error(
@@ -93,9 +94,10 @@ class OpenAIEmbedding(BaseTextEmbedding, OpenAILLMImpl):
                 )
 
                 continue
-        chunk_embeddings = np.average(chunk_embeddings, axis=0, weights=chunk_lens)
-        chunk_embeddings = chunk_embeddings / np.linalg.norm(chunk_embeddings)
-        return chunk_embeddings.tolist()
+        # chunk_embeddings = np.average(chunk_embeddings, axis=0, weights=chunk_lens)
+        # chunk_embeddings = chunk_embeddings / np.linalg.norm(chunk_embeddings)
+        # return chunk_embeddings.tolist()
+        return chunk_embeddings
 
     async def aembed(self, text: str, **kwargs: Any) -> list[float]:
         """

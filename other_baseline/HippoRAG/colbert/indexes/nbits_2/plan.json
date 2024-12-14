@@ -46,15 +46,15 @@
         "root": "",
         "experiment": "colbert",
         "index_root": null,
-        "name": "2024-11\/30\/14.34.59",
+        "name": "2024-12\/12\/17.21.49",
         "rank": 0,
         "nranks": 1,
         "amp": true,
         "gpus": 1,
         "avoid_fork_if_possible": false
     },
-    "num_chunks": 2,
-    "num_partitions": 4096,
-    "num_embeddings_est": 216459.5761642456,
-    "avg_doclen_est": 6.594552040100098
+    "num_chunks": 1,
+    "num_partitions": 2048,
+    "num_embeddings_est": 39591.00077676773,
+    "avg_doclen_est": 6.848469257354736
 }

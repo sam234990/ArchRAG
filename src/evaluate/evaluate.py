@@ -383,15 +383,15 @@ def get_metric_score(prediction, ground_truths):
     }
 
 
-def get_blue_doc_qa(path, pred_col="pred", label_col="label"):
+def get_bleu_doc_qa(path, pred_col="pred", label_col="label"):
     df = pd.read_csv(path, na_filter=False)
 
     label_list, pred_list = get_label_pred_list(df, pred_col, label_col)
 
     # Load results
-    blue_1_list = []
-    blue_4_list = []
-    modify_blue_4_list = []
+    bleu_1_list = []
+    bleu_4_list = []
+    modify_bleu_4_list = []
     bleu_1_smooth_list = []
     bleu_4_smooth_list = []
     modify_bleu_4_smooth_list = []
@@ -409,9 +409,9 @@ def get_blue_doc_qa(path, pred_col="pred", label_col="label"):
         answer = answer.split("|")
 
         metrics_res = get_metric_score(prediction_str, answer)
-        blue_1_list.append(metrics_res["bleu_1"])
-        blue_4_list.append(metrics_res["bleu_4"])
-        modify_blue_4_list.append(metrics_res["modify_bleu_4"])
+        bleu_1_list.append(metrics_res["bleu_1"])
+        bleu_4_list.append(metrics_res["bleu_4"])
+        modify_bleu_4_list.append(metrics_res["modify_bleu_4"])
         bleu_1_smooth_list.append(metrics_res["bleu_1_smooth"])
         bleu_4_smooth_list.append(metrics_res["bleu_4_smooth"])
         modify_bleu_4_smooth_list.append(metrics_res["modify_bleu_4_smooth"])
@@ -420,20 +420,22 @@ def get_blue_doc_qa(path, pred_col="pred", label_col="label"):
         rouge_l_precision_list.append(metrics_res["rouge_l precision"])
         rouge_l_recall_list.append(metrics_res["rouge_l recall"])
 
-    blue_1 = sum(blue_1_list) * 100 / len(blue_1_list)
-    blue_4 = sum(blue_4_list) * 100 / len(blue_4_list)
-    modify_blue_4 = sum(modify_blue_4_list) * 100 / len(modify_blue_4_list)
+    bleu_1 = sum(bleu_1_list) * 100 / len(bleu_1_list)
+    bleu_4 = sum(bleu_4_list) * 100 / len(bleu_4_list)
+    modify_bleu_4 = sum(modify_bleu_4_list) * 100 / len(modify_bleu_4_list)
     bleu_1_smooth = sum(bleu_1_smooth_list) * 100 / len(bleu_1_smooth_list)
     bleu_4_smooth = sum(bleu_4_smooth_list) * 100 / len(bleu_4_smooth_list)
-    modify_bleu_4_smooth = sum(modify_bleu_4_smooth_list) * 100 / len(modify_bleu_4_smooth_list)
+    modify_bleu_4_smooth = (
+        sum(modify_bleu_4_smooth_list) * 100 / len(modify_bleu_4_smooth_list)
+    )
     meteor = sum(meteor_list) * 100 / len(meteor_list)
     rouge_l_f1 = sum(rouge_l_f1_list) * 100 / len(rouge_l_f1_list)
     rouge_l_precision = sum(rouge_l_precision_list) * 100 / len(rouge_l_precision_list)
     rouge_l_recall = sum(rouge_l_recall_list) * 100 / len(rouge_l_recall_list)
 
-    df["blue_1" + pred_col] = blue_1_list
-    df["blue_4" + pred_col] = blue_4_list
-    df["modify_blue_4" + pred_col] = modify_blue_4_list
+    df["bleu_1" + pred_col] = bleu_1_list
+    df["bleu_4" + pred_col] = bleu_4_list
+    df["modify_bleu_4" + pred_col] = modify_bleu_4_list
     df["bleu_1_smooth" + pred_col] = bleu_1_smooth_list
     df["bleu_4_smooth" + pred_col] = bleu_4_smooth_list
     df["modify_bleu_4_smooth" + pred_col] = modify_bleu_4_smooth_list
@@ -444,18 +446,18 @@ def get_blue_doc_qa(path, pred_col="pred", label_col="label"):
 
     df.to_csv(path, index=False)
 
-    print(f"Blue-1: {blue_1:.4f}")
-    print(f"Blue-4: {blue_4:.4f}")
-    print(f"Modify Blue-4: {modify_blue_4:.4f}")
-    print(f"Blue-1 Smooth: {bleu_1_smooth:.4f}")
-    print(f"Blue-4 Smooth: {bleu_4_smooth:.4f}")
-    print(f"Modify Blue-4 Smooth: {modify_bleu_4_smooth:.4f}")
+    print(f"Bleu-1: {bleu_1:.4f}")
+    print(f"Bleu-4: {bleu_4:.4f}")
+    print(f"Modify Bleu-4: {modify_bleu_4:.4f}")
+    print(f"Bleu-1 Smooth: {bleu_1_smooth:.4f}")
+    print(f"Bleu-4 Smooth: {bleu_4_smooth:.4f}")
+    print(f"Modify Bleu-4 Smooth: {modify_bleu_4_smooth:.4f}")
     print(f"Meteor: {meteor:.4f}")
     print(f"Rouge-l F1: {rouge_l_f1:.4f}")
     print(f"Rouge-l Precision: {rouge_l_precision:.4f}")
     print(f"Rouge-l Recall: {rouge_l_recall:.4f}")
 
-    return blue_1
+    return bleu_1
 
 
 dataset_name_path = {
@@ -463,7 +465,9 @@ dataset_name_path = {
     "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/mintaka_test_qa.json",
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
-    "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa.json",
+    "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa_all.json",
+    "narrativeqa_train":"/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/narrativeqa.json",
+    "narrativeqa_test":"/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/narrativeqa.json",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/webqsp_qa.json",
 }
 
@@ -473,6 +477,8 @@ baseline_save_path_dict = {
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
     "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
+    "narrativeqa_train":"/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset",
+    "narrativeqa_test":"/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/baseline",
 }
 

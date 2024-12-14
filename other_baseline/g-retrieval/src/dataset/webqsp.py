@@ -181,5 +181,5 @@ if __name__ == "__main__":
         for i in range(2)
     ]
     for data in subsets[0]:
-        print(data['desc'][:4000])
+        print(data["desc"][:4000])
         print(data)

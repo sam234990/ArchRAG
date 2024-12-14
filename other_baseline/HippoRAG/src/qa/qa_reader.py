@@ -303,6 +303,9 @@ if __name__ == "__main__":
         elif args.dataset == "2wikimultihopqa":
             prompt_path = "data/ircot_prompts/2wikimultihopqa/gold_with_3_distractors_context_cot_qa_codex.txt"
             corpus = json.load(open("data/2wikimultihopqa_corpus.json", "r"))
+        else:
+            prompt_path = "data/ircot_prompts/hotpotqa/gold_with_3_distractors_context_cot_qa_codex.txt"
+            corpus = json.load(open("data/hotpotqa_corpus.json", "r"))
         demos = parse_prompt(prompt_path)
 
     # processed id set

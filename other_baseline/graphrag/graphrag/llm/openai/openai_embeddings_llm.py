@@ -14,6 +14,7 @@ from graphrag.llm.types import (
 
 from .openai_configuration import OpenAIConfiguration
 from .types import OpenAIClientTypes
+import ollama
 
 
 class OpenAIEmbeddingsLLM(BaseLLM[EmbeddingInput, EmbeddingOutput]):
@@ -33,8 +34,13 @@ class OpenAIEmbeddingsLLM(BaseLLM[EmbeddingInput, EmbeddingOutput]):
             "model": self.configuration.model,
             **(kwargs.get("model_parameters") or {}),
         }
-        embedding = await self.client.embeddings.create(
-            input=input,
-            **args,
-        )
-        return [d.embedding for d in embedding.data]
+        # embedding = await self.client.embeddings.create(
+        #     input=input,
+        #     **args,
+        # )
+        # return [d.embedding for d in embedding.data]
+        embedding_list = []
+        for inp in input:
+            embedding = ollama.embeddings(model="nomic-embed-text", prompt=inp)
+            embedding_list.append(embedding["embedding"])
+        return embedding_list

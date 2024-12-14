@@ -7,7 +7,7 @@ import asyncio
 import os
 from pathlib import Path
 from typing import cast
-
+import re
 import pandas as pd
 
 from graphrag.config import (
@@ -25,6 +25,7 @@ src_path = "/home/wangshu/rag/hier_graph_rag"
 sys.path.append(os.path.abspath(src_path))
 from src.evaluate.evaluate import (
     get_accuracy_doc_qa,
+    get_bleu_doc_qa,
     dataset_name_path,
     baseline_save_path_dict,
 )
@@ -73,6 +74,15 @@ def run_global_search(
     )
 
 
+def extract_doc_idx(path):
+    # 使用正则表达式匹配路径中的数字
+    match = re.search(r'(\d+)', path)
+    if match:
+        return match.group(1)
+    else:
+        raise ValueError("No numeric doc_idx found in the path")
+
+
 def docqa_global_search(
     config_dir: str | None,
     data_dir: str | None,
@@ -87,9 +97,9 @@ def docqa_global_search(
     Loads index files required for global search and calls the Query API.
     """
     import warnings
-    warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
 
-    
+    warnings.simplefilter(action="ignore", category=pd.errors.SettingWithCopyWarning)
+
     data_dir, root_dir, config = _configure_paths_and_settings(
         data_dir, root_dir, config_dir
     )
@@ -104,21 +114,29 @@ def docqa_global_search(
     final_community_reports: pd.DataFrame = pd.read_parquet(
         data_path / "create_final_community_reports.parquet"
     )
-    
+
     dataset_path = dataset_name_path[dataset_name]
-    
+    if dataset_name == "narrativeqa_train" or dataset_name == "narrativeqa_test":
+        doc_idx = extract_doc_idx(root_dir)
+        dataset_path = dataset_path.format(doc_idx=doc_idx)
+
+
     print(f"Dataset Path : {dataset_path}")
-    
+
     dataset = pd.read_json(dataset_path, orient="records", lines=True)
     dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
     print(f"Dataset Shape : {dataset.shape}")
 
     save_dir = baseline_save_path_dict[dataset_name]
-    save_path = os.path.join(save_dir, f"graphrag.csv")
+    if dataset_name == "narrativeqa_train" or dataset_name == "narrativeqa_test":
+        doc_idx = extract_doc_idx(root_dir)
+        save_dir = save_dir.format(doc_idx=doc_idx)
+        
+    save_path = os.path.join(save_dir, f"graphrag_global.csv")
 
     start_time = time.time()
-    
+
     updated_dataset = asyncio.run(
         process_dataset_queries(
             dataset=dataset,
@@ -133,12 +151,16 @@ def docqa_global_search(
     )
 
     print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
-    
+
     updated_dataset.to_csv(save_path, index=False)
 
-    hit = get_accuracy_doc_qa(save_path)
-    print(f"Test Hit : {hit}")
-    return 
+    if "narrative" in dataset_name:
+        Blue_1 = get_bleu_doc_qa(save_path)
+        print(f"Test Blue_1 : {Blue_1}")
+    else:
+        hit = get_accuracy_doc_qa(save_path)
+        print(f"Test Hit : {hit}")
+    return
 
 
 async def limited_search(
@@ -199,10 +221,10 @@ async def process_dataset_queries(
     for response, tokens in results:
         responses.append(response)
         all_tokens += tokens
-    
+
     # 将结果写入 DataFrame 的新列 'pred'
     dataset["pred"] = responses
-    
+
     # 输出总 token 数
     print(f"Total tokens used: {all_tokens}")
 
@@ -257,6 +279,167 @@ def run_local_search(
             query=query,
         )
     )
+
+
+def docqa_local_search(
+    config_dir: str | None,
+    data_dir: str | None,
+    root_dir: str | None,
+    community_level: int,
+    response_type: str,
+    dataset_name: str,
+    max_concurrent_tasks: int,
+):
+
+    data_dir, root_dir, config = _configure_paths_and_settings(
+        data_dir, root_dir, config_dir
+    )
+    data_path = Path(data_dir)
+
+    final_nodes = pd.read_parquet(data_path / "create_final_nodes.parquet")
+    final_community_reports = pd.read_parquet(
+        data_path / "create_final_community_reports.parquet"
+    )
+    final_text_units = pd.read_parquet(data_path / "create_final_text_units.parquet")
+    final_relationships = pd.read_parquet(
+        data_path / "create_final_relationships.parquet"
+    )
+    final_entities = pd.read_parquet(data_path / "create_final_entities.parquet")
+    final_covariates_path = data_path / "create_final_covariates.parquet"
+    final_covariates = (
+        pd.read_parquet(final_covariates_path)
+        if final_covariates_path.exists()
+        else None
+    )
+
+    dataset_path = dataset_name_path[dataset_name]
+    if dataset_name == "narrativeqa_train" or dataset_name == "narrativeqa_test":
+        doc_idx = extract_doc_idx(root_dir)
+        dataset_path = dataset_path.format(doc_idx=doc_idx)
+    
+    print(f"Dataset Path : {dataset_path}")
+
+    dataset = pd.read_json(dataset_path, orient="records", lines=True)
+    dataset.rename(columns={"answers": "label"}, inplace=True)
+    dataset["id"] = range(len(dataset))
+    print(f"Dataset Shape : {dataset.shape}")
+
+    save_dir = baseline_save_path_dict[dataset_name]
+    if dataset_name == "narrativeqa_train" or dataset_name == "narrativeqa_test":
+        doc_idx = extract_doc_idx(root_dir)
+        save_dir = save_dir.format(doc_idx=doc_idx)
+        
+    save_path = os.path.join(save_dir, f"graphrag_local.csv")
+
+    start_time = time.time()
+
+    updated_dataset = asyncio.run(
+        process_dataset_queries_local(
+            dataset=dataset,
+            config=config,
+            final_nodes=final_nodes,
+            final_community_reports=final_community_reports,
+            final_text_units=final_text_units,
+            final_relationships=final_relationships,
+            final_entities=final_entities,
+            final_covariates=final_covariates,
+            community_level=community_level,
+            response_type=response_type,
+            max_concurrent_tasks=max_concurrent_tasks,
+        )
+    )
+
+    print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
+
+    updated_dataset.to_csv(save_path, index=False)
+
+    if "narrative" in dataset_name:
+        Blue_1 = get_bleu_doc_qa(save_path)
+        print(f"Test Blue_1 : {Blue_1}")
+    else:
+        hit = get_accuracy_doc_qa(save_path)
+        print(f"Test Hit : {hit}")
+    return
+
+
+async def limited_search_local(
+    query,
+    config,
+    final_nodes,
+    final_community_reports,
+    final_text_units,
+    final_relationships,
+    final_entities,
+    final_covariates,
+    community_level,
+    response_type,
+    semaphore,
+):
+    async with semaphore:
+        response, tokens = await api.local_search(
+            config=config,
+            nodes=final_nodes,
+            entities=final_entities,
+            community_reports=final_community_reports,
+            text_units=final_text_units,
+            relationships=final_relationships,
+            covariates=final_covariates,
+            community_level=community_level,
+            response_type=response_type,
+            query=query,
+        )
+        return response, tokens
+
+
+async def process_dataset_queries_local(
+    dataset,
+    config,
+    final_nodes,
+    final_community_reports,
+    final_text_units,
+    final_relationships,
+    final_entities,
+    final_covariates,
+    community_level,
+    response_type,
+    max_concurrent_tasks=5,
+):
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+    tasks = []
+
+    # 提取 DataFrame 中的 question 列，创建查询任务
+    for query in dataset["question"]:
+        task = limited_search_local(
+            query,
+            config,
+            final_nodes,
+            final_community_reports,
+            final_text_units,
+            final_relationships,
+            final_entities,
+            final_covariates,
+            community_level,
+            response_type,
+            semaphore,
+        )
+        tasks.append(task)
+
+    # 并发执行所有任务，并返回结果
+    results = await asyncio.gather(*tasks)
+
+    responses = []
+    all_tokens = 0
+    for response, tokens in results:
+        responses.append(response)
+        all_tokens += tokens
+
+    # 将结果写入 DataFrame 的新列 'pred'
+    dataset["pred"] = responses
+
+    # 输出总 token 数
+    print(f"Total tokens used: {all_tokens}")
+
+    return dataset
 
 
 def _configure_paths_and_settings(

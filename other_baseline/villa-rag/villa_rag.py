@@ -11,20 +11,49 @@ os.environ["https_proxy"] = "http://127.0.0.1:7892"
 
 
 from src.llm import llm_invoker
+from src.lm_emb import openai_embedding
 from src.evaluate.evaluate import *
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
 import argparse
 import wandb
+import faiss
 
 
-def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_args):
+def process_worker(
+    dataset_part: pd.DataFrame,
+    index,
+    corpus,
+    process_id,
+    prompt,
+    llm_invoker_args,
+    topk=2,
+):
     results = []
     all_token = 0
     for i in range(len(dataset_part)):
         data = dataset_part.iloc[i]
-        query_content = data["question"] + prompt
+
+        query_embedding = openai_embedding(
+            data["question"],
+            llm_invoker_args.embedding_api_key,
+            llm_invoker_args.embedding_api_base,
+            llm_invoker_args.embedding_model,
+        )
+        query_embedding = np.array(query_embedding).reshape(1, -1)
+        _, preds = index.search(query_embedding, topk)
+        retrieval_context_idx = preds.flatten()
+        retrieval_context = ""
+        for idx in retrieval_context_idx:
+            retrieval_context += (
+                corpus.iloc[idx]["title"] + corpus.iloc[idx]["content"] + " "
+            )
+
+        query_content = prompt.format(
+            question=data["question"], context=retrieval_context
+        )
+
         llm_res, token = llm_invoker(query_content, args=llm_invoker_args)
         all_token += token
         tmp_res = {
@@ -40,23 +69,20 @@ def process_worker(dataset_part: pd.DataFrame, process_id, prompt, llm_invoker_a
     return results, all_token
 
 
-def run_zero_cot_llm(
-    dataset: pd.DataFrame, strategy, save_dir, args=None, num_workers=12
+def rag_llm(
+    dataset: pd.DataFrame, index, corpus, save_dir, args=None, num_workers=12, topk=2
 ):
     if args.debug_flag:
         dataset = dataset.iloc[:20]
-    print(f"Running {strategy} strategy")
 
+    prompt = """Qustion: {question}
+{context} 
+Answer: """
     wandb.init(
         project=f"{args.project}",
-        name=f"{args.dataset_name}_{args.strategy}_{args.engine}",
+        name=f"{args.dataset_name}_villa_rag_{args.engine}_topk_{topk}",
         config=args,
     )
-
-    if strategy == "zero-shot":
-        prompt = " \n Answer: "
-    elif strategy == "cot":
-        prompt = "Let’s think step by step. \n Answer: "
 
     dataset_parts = np.array_split(dataset, num_workers)
     print(f"dataset size: {len(dataset)}")
@@ -71,7 +97,7 @@ def run_zero_cot_llm(
         results = pool.starmap(
             process_worker,
             [
-                (dataset_part, idx, prompt, llm_args)
+                (dataset_part, index, corpus, idx, prompt, llm_args, topk)
                 for idx, dataset_part in enumerate(dataset_parts)
             ],
         )
@@ -84,7 +110,7 @@ def run_zero_cot_llm(
     print(f"Total tokens used: {total_tokens}")
 
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{strategy}_{args.engine}.csv")
+    save_path = os.path.join(save_dir, f"villa_rag_{args.engine}_topk{topk}.csv")
 
     print(f"Saving results to {save_path}")
 
@@ -112,7 +138,27 @@ class Args:
     def __init__(self):
         self.api_key = "ollama"
         self.api_base = "http://localhost:5000/forward"
-        self.engine = "llama3.1:8b4k"
+        self.embedding_local = False
+        self.embedding_model_local = "nomic-embed-text"
+        self.embedding_api_key = "ollama"
+        self.embedding_api_base = "http://localhost:5000/forward"
+        self.embedding_model = "nomic-embed-text"
+
+
+def load_index(dataset_name):
+
+    corpus_path = {
+        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.json",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.json",
+    }
+    index_path = {
+        "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.index",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.index",
+    }
+
+    index = faiss.read_index(index_path[dataset_name])
+    corpus = pd.read_json(corpus_path[dataset_name], lines=True, orient="records")
+    return index, corpus
 
 
 if __name__ == "__main__":
@@ -124,14 +170,8 @@ if __name__ == "__main__":
         "--dataset_name",
         type=str,
         choices=dataset_name_path.keys(),  # 只允许选择这两个数据集
-        default="narrativeqa",
+        default="hotpot",
         help=f"Select the dataset name. Options are: {' '.join(dataset_name_path.keys())}",
-    )
-
-    parser.add_argument(
-        "--strategy",
-        type=str,
-        default="zero-shot",
     )
 
     parser.add_argument(
@@ -145,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=28,
+        default=1,
         help="Number of workers for multiprocessing",
     )
 
@@ -163,9 +203,15 @@ if __name__ == "__main__":
         help="Engine name for LLM",
     )
 
+    parser.add_argument(
+        "--topk",
+        type=int,
+        default=2,
+        help="Top k retrieval context",
+    )
+
     args = parser.parse_args()
 
-    strategy = args.strategy
     dataset_path = dataset_name_path[args.dataset_name]
     save_dir = baseline_save_path_dict[args.dataset_name]
 
@@ -174,6 +220,14 @@ if __name__ == "__main__":
     # dataset.rename(columns={"answers": "label"}, inplace=True)
     dataset["id"] = range(len(dataset))
 
-    run_zero_cot_llm(
-        dataset, strategy, save_dir=save_dir, args=args, num_workers=args.num_workers
+    index, corpus = load_index(args.dataset_name)
+
+    rag_llm(
+        dataset=dataset,
+        index=index,
+        corpus=corpus,
+        save_dir=save_dir,
+        args=args,
+        num_workers=args.num_workers,
+        topk=args.topk,
     )

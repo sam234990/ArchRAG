@@ -12,7 +12,7 @@ generate_strategy="mr"
 response_type="QA"
 
 temperature=0.1
-only_entity=False
+only_entity=True
 ppr_refine=False
 
 involve_llm_res=False
@@ -33,7 +33,8 @@ dataset_name="multihop"
 python_file="/home/wangshu/rag/hier_graph_rag/src/evaluate/test_qa.py"
 log_file="./eval/usage_evaluate_t${temperature}_${strategy}_${k_each_level}_""\
 ${k_final}_${topk_e}_${all_k_inference}_${generate_strategy}_""\
-${response_type}_inv${involve_llm_res}.log"
+inv${involve_llm_res}_oe${only_entity}.log"
+
 # 设置PYTHONPATH
 export PYTHONPATH="/home/wangshu/rag/hier_graph_rag/:$PYTHONPATH"
 

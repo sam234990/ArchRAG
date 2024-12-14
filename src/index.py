@@ -8,6 +8,10 @@ import time
 
 
 def make_hc_index(args):
+    # if the output directory does not exist, create it
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+            
     all_token = 0
     overall_start_time = time.time()
     graph, entities_df, final_relationships = read_graph_nx(
