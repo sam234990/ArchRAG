@@ -561,6 +561,21 @@ def create_arg_parser():
         default=15,
         help="Set the maximum size of the cluster",
     )
+    
+    parser.add_argument(
+        "--augment_graph",
+        type=lambda x: x.lower() == "true",
+        default=True,
+        help="Whether to augment the graph or not",
+    )
+    
+    parser.add_argument(
+        "--cluster_method",
+        type=str,
+        default="weighted_leiden",
+        help="Set the clustering method for attribute clustering",
+    )
+        
 
     # add LLM parameters
     parser.add_argument(
@@ -697,7 +712,8 @@ def create_inference_arg_parser():
         "--base_path",
         type=str,
         # required=True,
-        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag",
+        # default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag",
+        default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag",
         help="Base path to the directory containing the graph data.",
     )
 
@@ -719,7 +735,8 @@ def create_inference_arg_parser():
         "--output_dir",
         type=str,
         # required=True,
-        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b4k",
+        # default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b4k",
+        default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b4k",
         help="Output dir path for index",
     )
 
@@ -728,7 +745,8 @@ def create_inference_arg_parser():
         "--dataset_name",
         type=str,
         # required=True,
-        default="hotpot",
+        # default="hotpot",
+        default="multihop",
         help="Dataset name for evaluation",
     )
 

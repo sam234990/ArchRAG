@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
-from utils import embedding_similarity
+from src.utils import embedding_similarity
 import networkx as nx
 import tqdm
 # import torch.nn.functional as F
@@ -91,86 +91,6 @@ def calculate_our_similarity(graph:nx.Graph, c_n_mapping):
     # 所有的simlarity球平均值
     similarity = sum(cluster_similarities)/len(cluster_similarities)
     return similarity
-
-# 使用Attributed Graph Clustering: A Deep Attentional Embedding Approach 文章中的计算p,q的方式计算kl散度
-# https://github.com/Tiger101010/DAEGC/blob/main/DAEGC/daegc.py line 41-49
-
-def get_Q(cluster_layer, z, v):
-    # q = 1.0 / (1.0 + torch.sum(torch.pow(z.unsqueeze(1) - cluster_layer, 2), 2) / v)
-    # q = q.pow((v + 1.0) / 2.0)
-    # q = (q.t() / torch.sum(q, 1)).t()
-    distances = np.sum(np.square(z - cluster_layer), axis=1)
-    # 计算q
-    q = 1.0 / (1.0 + distances / v)
-    q = np.power(q, (v + 1.0) / 2.0)
-    # 归一化q
-    q = q / np.sum(q, axis=1)[:, np.newaxis]
-    return q
-
-def target_distribution(q):
-    weight = q**2 / q.sum(0)
-    return (weight.t() / weight.sum(1)).t()
-
-def calculate_kl_div(graph:nx.Graph, c_n_mapping):
-    
-    # 簇中心, 用每个community的每个节点的均值代替
-    cluster_centers={}
-    v=1
-    for key, value in c_n_mapping.items():
-        node_in_cluster = []
-        for a_node in value:
-            node_in_cluster.append(graph.nodes[a_node]['embedding'])
-        node_emb_in_cluster = np.array(node_in_cluster)
-        
-        # community的emb
-        cluster_node_emb = node_emb_in_cluster.mean(axis=0)
-        cluster_centers[key] = cluster_node_emb
-    
-    # 计算q
-    qs: dict[str, list[int]] = {}
-    for key, value in c_n_mapping.items():
-        qk = []
-        for z in value:
-            a_distance = np.sum(np.square(graph.nodes[z]['embedding'] - cluster_centers[key]), axis=1)
-            target_q = 1.0 / (1.0 + a_distance / v)
-            target_q = np.power(target_q, (v + 1.0) / 2.0)
-            distances = np.array([0 for _ in range(len(graph.nodes[z]['embedding']))])
-            for s in cluster_centers:
-                distances += 1.0 / (1.0 + np.sum(np.square(graph.nodes[z]['embedding'] - cluster_centers[s]), axis=1))
-            
-            q = target_q / np.sum(distances, axis=1)
-            qk.append(q)
-        qs[key] = qk
-    
-    # 计算p
-    ps: dict[str, list[int]] = {}
-    total_weight = np.array([0 for _ in range(len(graph.nodes[z]['embedding']))])
-    for key, value in qs.item():
-        a_qs = np.array(value)
-        pk=[]
-        for q in a_qs:
-            weight = q**2 / np.sum(a_qs, axis=1)
-            total_weight += weight
-            pk.append(weight)
-        ps[key] = pk
-
-    for key, value in ps.item():
-        a_qs = np.array(value)
-        new_pk=[]
-        for q in a_qs:
-            final_q = q / total_weight
-            new_pk.append(final_q)
-        ps[key] = new_pk
-    # 计算kl散度
-    kl_div = []
-    for key, value in qs.item():
-        for i in range(len(value)):
-            a_kl_arr = ps[key][i] * np.log2(ps[key][i] / qs[key][i])
-            kl_div.append(np.sum(a_kl_arr))
-    #############################################
-    # 这里的指标需要考虑好最后需要时这么算吗
-    #############################################
-    return sum(kl_div) / len(kl_div)
 
 def evaluation(graph:nx.Graph, c_n_mapping):
     sil_score, ch_score=calculate_silhouette_score(graph, c_n_mapping)

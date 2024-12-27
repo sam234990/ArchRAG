@@ -108,9 +108,13 @@ def test_qa(query_paras, args):
         if isinstance(response_report, dict):
             qa_df.loc[idx, "raw_result"] = response_report.get("raw_result", "None")
             qa_df.loc[idx, "pred"] = response_report.get("pred", "None")
+            for key, value in response_report.items():
+                if key not in ["raw_result", "pred"]:
+                    qa_df.loc[idx, key] = value
         else:
             qa_df.loc[idx, "raw_result"] = "None"
             qa_df.loc[idx, "pred"] = "None"
+            
 
     print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
     print(f"Total token: {all_token}")
@@ -141,7 +145,7 @@ def eval_inference(prediction_path, args):
             print("Test Raw Result")
             Blue_1_raw = get_bleu_doc_qa(prediction_path, pred_col="raw_result")
             print(f"Test Hit Blue_1 {Blue_1_raw}")
-            wandb.log({"Test Blue_1": acc_raw})
+            wandb.log({"Test Blue_1": Blue_1_raw})
         else:
             hit = get_accuracy_doc_qa(prediction_path)
             print(f"Test Hit {hit}")

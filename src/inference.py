@@ -43,6 +43,16 @@ def hcarag(
         query_paras=query_paras,
     )
     all_token += total_token
+
+    topk_enetity_str = df_to_str(retrieval_dict["topk_entity"])
+    topk_community_str = df_to_str(retrieval_dict["topk_community"])
+    topk_related_r_str = df_to_str(retrieval_dict["topk_related_r"])
+    topk_chunk_str = df_to_str(retrieval_dict["topk_chunk"])
+    response_report["topk_entity"] = topk_enetity_str
+    response_report["topk_community"] = topk_community_str
+    response_report["topk_related_r"] = topk_related_r_str
+    response_report["topk_chunk"] = topk_chunk_str
+
     return response_report, all_token
 
 
@@ -120,8 +130,8 @@ def hcarag_retrieval(
         distances_flat = distances.flatten()
         preds_flat = preds.flatten()
 
-        for dist, pred in zip(distances_flat, preds_flat):
-            all_results.append((dist, pred))
+        for dist, villa_pred in zip(distances_flat, preds_flat):
+            all_results.append((dist, villa_pred))
 
     # 根据距离排序，选择距离最小的 final_k 个结果
     all_results = sorted(all_results, key=lambda x: x[0])
@@ -162,8 +172,8 @@ def hcarag_retrieval(
 
     if query_paras["topk_chunk"] > 0:
         topk = query_paras["topk_chunk"]
-        _, pred = villa_index.search(query_embedding, topk)
-        retrieval_context_idx = preds.flatten()
+        _, villa_pred = villa_index.search(query_embedding, topk)
+        retrieval_context_idx = villa_pred.flatten()
         topk_chunk_df = chunk_df.iloc[retrieval_context_idx]
         retrieval_dict["topk_chunk"] = topk_chunk_df
 
@@ -322,6 +332,9 @@ def hcarag_inference_mr(
     response_report, cur_token_reduce = reduce_inference(map_res_df, query, args)
     all_token += cur_token_reduce
 
+    map_res_str = df_to_str(map_res_df)
+    response_report["map_res"] = map_res_str
+
     return response_report, all_token
 
 
@@ -429,7 +442,6 @@ def load_index(args):
     )
 
     relation_df["embedding"] = relation_df["embedding_idx"].map(idx_embed_map)
-        
 
     villa_index, chunk_df = load_villa_index(args)
 
@@ -449,9 +461,9 @@ def load_index(args):
         "chunk_df": chunk_df,
         "graph": graph,
     }
-    
+
     print("Index loaded successfully.")
-    
+
     # return hc_index, entity_df, community_df, level_summary_df, relation_df
     return index_dict
 
@@ -483,12 +495,23 @@ def load_villa_index(args):
     return index, corpus
 
 
+def df_to_str(input_df: pd.DataFrame):
+    if input_df is None:
+        return "NoneType"
+    row_sep = "<row-sep>\n"
+    columns = [col for col in input_df.columns if "embedding" not in col]
+    res_str = ",".join(columns) + row_sep
+    for index, row in input_df.iterrows():
+        res_str += ",".join([str(row[col]) for col in columns]) + row_sep
+    return res_str
+
+
 if __name__ == "__main__":
     parser = create_inference_arg_parser()
     args = parser.parse_args()
 
     index_dict = load_index(args)
-# {"question":"What relationship does Fred Gehrke have to the 23rd overall pick in the 2010 Major League Baseball Draft?","answers":"great-grandfather","label":"great-grandfather"}
+    # {"question":"What relationship does Fred Gehrke have to the 23rd overall pick in the 2010 Major League Baseball Draft?","answers":"great-grandfather","label":"great-grandfather"}
     test_question = "What relationship does Fred Gehrke have to the 23rd overall pick in the 2010 Major League Baseball Draft?"
     query_paras = {
         "strategy": "global",
@@ -501,7 +524,7 @@ if __name__ == "__main__":
         "generate_strategy": "mr",
         "response_type": "QA",
         "involve_llm_res": True,
-        "topk_chunk": args.topk_chunk,
+        "topk_chunk": 2,
     }
     response, total_token = hcarag(
         query_content=test_question,
@@ -512,3 +535,6 @@ if __name__ == "__main__":
     print(response["raw_result"])
     print(response["pred"])
     print(f"Total tokens: {total_token}")
+    for key, value in response.items():
+        print(f"{key}: {value}")
+    print("Done.")

@@ -7,7 +7,9 @@ import pandas as pd
 from graspologic.partition import hierarchical_leiden, leiden
 from src.utils import *
 from community_report import community_report_batch
-
+from sklearn.cluster import SpectralClustering
+from scipy.sparse import csr_matrix
+import tqdm
 
 def attribute_hierarchical_clustering(
     weighted_graph: nx.graph, attributes: pd.DataFrame
@@ -105,11 +107,13 @@ def compute_leiden_communities(
 # then, we get the community report and the corresponding embedding
 # finally, we reconstruct the graph with the community information
 # and use this graph for the next level community computation
-def compute_leiden(graph: nx.Graph, seed=0xDEADBEEF) -> dict[str, list[int]]:
+def compute_leiden(
+    graph: nx.Graph, seed=0xDEADBEEF, weighted=True
+) -> dict[str, list[int]]:
     # 使用 leiden 算法计算一层
     community_mapping = leiden(
         graph,
-        is_weighted=True,
+        is_weighted=weighted,
         random_seed=seed,
     )
     c_n_mapping: dict[str, list[int]] = {}
@@ -123,9 +127,11 @@ def compute_leiden(graph: nx.Graph, seed=0xDEADBEEF) -> dict[str, list[int]]:
     return c_n_mapping
 
 
-def compute_leiden_max_size(graph: nx.Graph, max_cluster_size: int, seed=0xDEADBEEF):
+def compute_leiden_max_size(
+    graph: nx.Graph, max_cluster_size: int, seed=0xDEADBEEF, weighted=True
+):
     community_mapping = hierarchical_leiden(
-        graph, max_cluster_size=max_cluster_size, random_seed=seed, is_weighted=True
+        graph, max_cluster_size=max_cluster_size, random_seed=seed, is_weighted=weighted
     )
     c_n_mapping: dict[str, list[int]] = {}
 
@@ -137,6 +143,57 @@ def compute_leiden_max_size(graph: nx.Graph, max_cluster_size: int, seed=0xDEADB
             c_n_mapping[community_id] = []
         c_n_mapping[community_id].append(partition.node)
 
+    return c_n_mapping
+
+
+def spectralClustering(graph: nx.graph, seed, l, is_weighted):
+    c_n_mapping: dict[str, list[int]] = {}
+    # 转换成sklearn中SpectralClustering的输入格式
+    num_nodes = len(graph.nodes())
+
+    index = np.array([node for node in graph.nodes()])
+    # 谱聚类
+
+    if not is_weighted:
+        # 非加权图
+        adj_matrix = nx.to_scipy_sparse_array(graph, dtype=np.int32, format="csr")
+        adj_matrix.indices = adj_matrix.indices.astype(np.int32, casting="same_kind")
+        adj_matrix.indptr = adj_matrix.indptr.astype(np.int32, casting="same_kind")
+        sc = SpectralClustering(
+            affinity="precomputed",
+            assign_labels="discretize",
+            random_state=seed,
+            n_clusters=l,
+        )
+    else:
+        # 加权图
+        adj_matrix = [[0 for _ in range(num_nodes)] for _ in range(num_nodes)]
+        for node in tqdm.tqdm(graph.adj):
+            indice_node = np.where(index == node)[0][0]
+            for neighbor in graph.adj[node]:
+                indice_neighbor = np.where(index == neighbor)[0][0]
+                adj_matrix[indice_node][indice_neighbor] = graph.adj[node][neighbor][
+                    "weight"
+                ]
+
+        adj_matrix = csr_matrix(adj_matrix)
+        sc = SpectralClustering(
+            affinity="precomputed",
+            assign_labels="discretize",
+            random_state=seed,
+            n_clusters=l,
+        )
+
+    # 获取聚类结果
+    cluster_result = sc.fit_predict(adj_matrix)
+
+    # 转换成c_n_mapping的格式
+
+    for node, label in enumerate(cluster_result):
+        cluster_label = str(label)
+        if cluster_label not in c_n_mapping:
+            c_n_mapping[cluster_label] = []
+        c_n_mapping[cluster_label].append(index[node])
     return c_n_mapping
 
 
@@ -295,22 +352,41 @@ def attr_cluster(
     while level <= max_level:
         print(f"Start clustering for level {level}")
 
-        # 计算余弦距离图
-        cos_graph = compute_distance(
-            graph,
-            x_percentile=args.wx_weight,
-            search_k=args.search_k,
-            m_du_sacle=args.m_du_scale,
-        )
-
-        # 使用 Leiden 算法进行聚类
-        if args.max_cluster_size != 0:
-            c_n_mapping = compute_leiden_max_size(
-                cos_graph, args.max_cluster_size, args.seed
+        # 1. augment graph and compute weight
+        if args.augment_graph is True:
+            # 计算余弦距离图
+            cos_graph = compute_distance(
+                graph,
+                x_percentile=args.wx_weight,
+                search_k=args.search_k,
+                m_du_sacle=args.m_du_scale,
             )
         else:
-            c_n_mapping = compute_leiden(cos_graph, args.seed)
+            cos_graph = graph
 
+        # 2. clustering
+        if args.augment_graph is True:
+            if args.cluster_method == "weighted_leiden":
+                c_n_mapping = compute_leiden_max_size(
+                    cos_graph, args.max_cluster_size, args.seed
+                )
+            else:
+                num_c = int(cos_graph.number_of_nodes() / (args.max_cluster_size))
+                c_n_mapping = spectralClustering(cos_graph, args.seed, num_c, True)
+        else:
+            if args.cluster_method == "weighted_leiden":
+                c_n_mapping = compute_leiden_max_size(
+                    cos_graph, args.max_cluster_size, args.seed, False
+                )
+            else:
+                num_c = int(cos_graph.number_of_nodes() / (args.max_cluster_size))
+                c_n_mapping = spectralClustering(cos_graph, args.seed, num_c, False)
+
+        # # 使用 Leiden 算法进行聚类
+        # if args.max_cluster_size != 0:
+
+        # else:
+        #     c_n_mapping = compute_leiden(cos_graph, args.seed)
 
         # 如果不是第一层，需要调整 community_id
         if level > 1:
@@ -371,7 +447,7 @@ def attr_cluster(
         new_community_df.to_csv(tmp_comunity_df_result, index=False)
         community_df = pd.concat([community_df, new_community_df], ignore_index=True)
         level += 1
-        
+
         # check for finish
         number_of_clusters = len(c_n_mapping)
         if number_of_clusters < min_clusters:
@@ -384,7 +460,7 @@ if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
     print_args(args)
-    
+
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
     community_df, all_token = attr_cluster(
         init_graph=graph,

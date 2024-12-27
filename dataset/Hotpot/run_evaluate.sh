@@ -27,11 +27,12 @@ involve_llm_res=True
 # topk_chunk=5
 temperature=0.1
 
-num_workers=32
+num_workers=20
 
-for chunk_k in {2..5}; do
+for chunk_k in {2..4}; do
     topk_chunk=$chunk_k
-    for level_k in {5..10}; do
+    for level_k in {5..8}; do
+    # for level_k in {1..4}; do
         k_each_level=$level_k
         echo "topk_chunk: $topk_chunk, k_each_level: $k_each_level"
 

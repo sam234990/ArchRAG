@@ -466,10 +466,11 @@ dataset_name_path = {
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/MultiHopRAG_qa.json",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/eval_hotpot_qa.json",
     "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa_all.json",
-    "narrativeqa_train":"/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/narrativeqa.json",
-    "narrativeqa_test":"/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/narrativeqa.json",
+    "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/narrativeqa.json",
+    "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/narrativeqa.json",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/webqsp_qa.json",
 }
+
 
 baseline_save_path_dict = {
     "mintaka": "/mnt/data/wangshu/hcarag/mintaka/QA/baseline",
@@ -477,8 +478,8 @@ baseline_save_path_dict = {
     "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline",
     "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/baseline",
     "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
-    "narrativeqa_train":"/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset",
-    "narrativeqa_test":"/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset",
+    "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset",
+    "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/baseline",
 }
 
