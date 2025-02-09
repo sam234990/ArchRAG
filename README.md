@@ -11,3 +11,27 @@ For more details, check out our paper.
 
 We implement the C-HNSW with faiss framework. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
 
+
+## Running ArchRAG
+
+Using our ArchRAG framework requires a two-step, offline index and online retrieval.
+
+### Offline Index
+
+We provide a bash for constructing ArchRAG index.
+
+```shell
+bash dataset/index.sh
+```
+
+### Online Retrieval
+
+We provide a bash for online retrieval given a specific dataset.
+
+```shell
+bash dataset/query.sh
+```
+
+## Data format and Environment
+
+Comming soon.
