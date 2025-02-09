@@ -136,9 +136,11 @@ if __name__ == "__main__":
     """
 
     result = llm_invoker(input_text=prompt, json=False)
+    # result = "aaa"
 
     file_path = f"./{dataset}_summary_questions_{time.time()}.txt"
-    with open(file_path, "w") as file:
+    with open(question_save_path, "w") as file:
         file.write(result)
+    print(result)
 
-    print(f"Queries written to {file_path}")
+    print(f"Queries written to {question_save_path}")

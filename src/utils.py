@@ -735,8 +735,8 @@ def create_inference_arg_parser():
         "--output_dir",
         type=str,
         # required=True,
-        # default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b4k",
-        default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b4k",
+        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag/hc_index_8b4k",
+        # default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/hc_index_8b4k",
         help="Output dir path for index",
     )
 
@@ -745,8 +745,8 @@ def create_inference_arg_parser():
         "--dataset_name",
         type=str,
         # required=True,
-        # default="hotpot",
-        default="multihop",
+        default="hotpot",
+        # default="multihop",
         help="Dataset name for evaluation",
     )
 
@@ -921,6 +921,13 @@ def create_inference_arg_parser():
         type=lambda x: x.lower() == "true",
         default=False,
         help="only use entity to inference",
+    )
+    
+    parser.add_argument(
+        "--wo_hierarchical",
+        type=lambda x: x.lower() == "true",
+        default=False,
+        help="Whether to without hierarchical community",
     )
 
     parser.add_argument(

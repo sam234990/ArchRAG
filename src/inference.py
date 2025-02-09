@@ -116,6 +116,8 @@ def hcarag_retrieval(
 
     if query_paras["only_entity"] is True:
         query_max_levl = 1
+    elif query_paras["wo_hierarchical"] is False:
+        query_max_levl = 2
     else:
         query_max_levl = hc_level + 1
 
@@ -329,7 +331,7 @@ def hcarag_inference_mr(
     )
     all_token += cur_token_map
 
-    response_report, cur_token_reduce = reduce_inference(map_res_df, query, args)
+    response_report, cur_token_reduce = reduce_inference(map_res_df, query, args, response_type=query_paras["response_type"])
     all_token += cur_token_reduce
 
     map_res_str = df_to_str(map_res_df)
@@ -472,13 +474,17 @@ def load_villa_index(args):
     dataset_name = args.dataset_name
     corpus_path = {
         "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.json",
-        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.json",
+        # "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.json",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.json",
+        "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.json",
         "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/corpus_chunk.json",
         "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/corpus_chunk.json",
     }
     index_path = {
         "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.index",
-        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.index",
+        # "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_corpus.index",
+        "multihop": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.index",
+        "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.index",
         "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
         "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
     }
@@ -516,6 +522,7 @@ if __name__ == "__main__":
     query_paras = {
         "strategy": "global",
         "only_entity": args.only_entity,
+        "wo_hierarchical": args.wo_hierarchical,
         "k_each_level": 5,
         "k_final": 10,
         "topk_e": args.topk_e,

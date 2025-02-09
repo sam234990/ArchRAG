@@ -43,7 +43,7 @@ def process_question(
         return idx, response_report, total_token
     except Exception as e:
         logging.error(f"Error processing question at index {idx}: {e}")
-        return idx, None
+        return idx, None, 0
 
 
 def test_qa(query_paras, args):
@@ -71,7 +71,10 @@ def test_qa(query_paras, args):
 
     save_file_str = "_".join([str(value) for value in query_paras.values()])
     save_file_str += ".csv"
-    inference_output_dir = args.output_dir + "/qa"
+    if args.dataset_name == "multihop_summary":
+        inference_output_dir = args.output_dir + "/summary"
+    else:
+        inference_output_dir = args.output_dir + "/qa"
     os.makedirs(inference_output_dir, exist_ok=True)
     save_file_qa = os.path.join(inference_output_dir, save_file_str)
     print(f"Save file: {save_file_qa}")
@@ -128,6 +131,10 @@ def test_qa(query_paras, args):
 
 
 def eval_inference(prediction_path, args):
+    if args.dataset_name == "multihop_summary":
+        print("Summarization task will be evaluated by LLM, use summary_eval.py file.")
+        return
+    
     if args.eval_mode == "KGQA":
         acc = get_accuracy_webqsp_qa(prediction_path)
         print(f"Test Hit {acc}")
@@ -297,6 +304,7 @@ if __name__ == "__main__":
     query_paras = {
         "strategy": args.strategy,
         "only_entity": args.only_entity,
+        "wo_hierarchical": args.wo_hierarchical,
         "k_each_level": args.k_each_level,
         "k_final": args.k_final,
         "topk_e": args.topk_e,

@@ -624,7 +624,11 @@ def reduce_inference(map_res_df, query, args, response_type="QA"):
             reduce_prompt, args, max_tokens=args.max_tokens, json=False
         )
         all_token += cur_token
-        success, direct_answer = qa_response_extract(raw_result)
+        if response_type == "QA":
+            success, direct_answer = qa_response_extract(raw_result)
+        else:
+            direct_answer = raw_result
+            success = True
         if success:
             break
         retries += 1

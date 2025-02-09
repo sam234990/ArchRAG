@@ -14,11 +14,19 @@ __pycache__/
 other_baseline/
 wandb/
 
+*.ipynb
+*.txt
+*.log
+*.json
+*.csv
+*.tsv
+*.zip
+
 lancedb/
 .vscode/
 test/
 datasets_io/
-# dataset/
+dataset/
 *.code-workspace
 *.swp
 *.swo

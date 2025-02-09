@@ -93,7 +93,11 @@ if __name__ == "__main__":
     query_indices = load_sampled_query_indices(args)
     
     hchnsw_index = read_index(args.output_dir, "hchnsw.index")
-    hnsw_index = read_index(args.output_dir, "hchnsw.index")
+    
+    hnsw_index_path = os.path.join(args.output_dir, "hnsw.index")
+    hnsw_index = faiss.read_index(hnsw_index_path)
+    print(f"level of index: {hnsw_index.hnsw.max_level}")
+    
     entity_path = os.path.join(args.output_dir, "entity_df_index.csv")
     entity_df = pd.read_csv(entity_path)
     entity_df["embedding"] = entity_df["embedding"].apply(
@@ -148,6 +152,8 @@ if __name__ == "__main__":
     # test hchnsw recall
     topks = [1, 2, 3, 4, 5, 10]
     level = 0
+    # level = 3
+    # level = hnsw_index.hnsw.max_level
     print()
     for topk in topks:
         ground_truths = top_k_indices[:, :topk]
@@ -165,7 +171,7 @@ if __name__ == "__main__":
         entity_index_list = entity_df.index_id.tolist()
         
         hchnsw_TP = 0
-        # pdb.set_trace()
+        
         for i, pred in tqdm.tqdm(enumerate(preds_hchnsw)):
             for j in pred:
                 index = entity_index_list.index(j)
@@ -176,15 +182,15 @@ if __name__ == "__main__":
         ###################################################
         # hnsw recall
         t3 = time.time()
-        distances_hnsw, preds_hnsw = hchnsw_index.search(checked_query_embeddings, k=topk, params=saerch_params)
+        distances_hnsw, preds_hnsw = hnsw_index.search(checked_query_embeddings, k=topk)
         t4 = time.time()
         
         hnsw_TP = 0
-        
+        # pdb.set_trace()
         for i, pred in tqdm.tqdm(enumerate(preds_hnsw)):
             for j in pred:
-                index = entity_index_list.index(j)
-                if index in ground_truths[i]:
+                # index = entity_index_list.index(j)
+                if j in ground_truths[i]:
                     hnsw_TP += 1
         hnsw_recall = hnsw_TP / (topk * len(preds_hnsw))
         

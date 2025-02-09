@@ -5,6 +5,7 @@ from metric.CODICIL import *
 import pandas as pd
 import time
 import pdb
+from src.attr_cluster import spectral_clustering_cupy
 
 def process_topk_graph(graph_path):
     read_graph = nx.read_gml(graph_path)
@@ -53,7 +54,7 @@ def process_topk_graph(graph_path):
 if __name__ == "__main__":
     parser = create_inference_arg_parser()
     args, _ = parser.parse_known_args()
-    args.max_cluster_size = 10
+    args.max_cluster_size = 5
     print(args)
 
 
@@ -68,25 +69,25 @@ if __name__ == "__main__":
     
     # 图增强方法
     # 1. cos graph
-    # cos_graph = compute_distance(graph) # cos graph
+    cos_graph = compute_distance(graph) # cos graph
     
     # 2. topk graph
-    k=5
-    alpha=0.5
-    num_workers=64
+    # k=3
+    # alpha=0.5
+    # num_workers=64
 
-    print("workers num:", num_workers)
-    Gu = create_content_edges(graph, k, embedding_similarity, num_workers)
-    # 采样
-    Esample = biased_edge_sampling(Gu, graph, alpha, embedding_similarity)
-    # (any)聚类算法，这里暂时先用k-means
-    cos_graph = nx.Graph(graph)
-    cos_graph.add_edges_from(Esample) # final topk graph
-    # save topk graph
-    saved_graph = nx.Graph(cos_graph)
-    for node in saved_graph.nodes():
-        saved_graph.nodes[node]['embedding'] = str(saved_graph.nodes[node]['embedding'])
-    nx.write_gml(saved_graph, f"/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/graph/{args.dataset_name}_topk_graph_edges_{len(saved_graph.edges())}_k_{k}.gml")
+    # print("workers num:", num_workers)
+    # Gu = create_content_edges(graph, k, embedding_similarity, num_workers)
+    # # 采样
+    # Esample = biased_edge_sampling(Gu, graph, alpha, embedding_similarity)
+    # # (any)聚类算法，这里暂时先用k-means
+    # cos_graph = nx.Graph(graph)
+    # cos_graph.add_edges_from(Esample) # final topk graph
+    # # save topk graph
+    # saved_graph = nx.Graph(cos_graph)
+    # for node in saved_graph.nodes():
+    #     saved_graph.nodes[node]['embedding'] = str(saved_graph.nodes[node]['embedding'])
+    # nx.write_gml(saved_graph, f"/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag/graph/{args.dataset_name}_topk_graph_edges_{len(saved_graph.edges())}_k_{k}.gml")
     
     ########################################################################
     # 从建好的图直接读取
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     # cos_graph = process_topk_graph(graph_path)
     
     
-    weighted=False # cos graph:True   topk_graph: False
+    weighted=True # cos graph:True   topk_graph: False
 
     # 使用 Leiden 算法进行聚类
     t1 = time.time()
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     print("similarity:",  our_sim)
     print("clustering_entropy_score:", cross_entropy)
     print("time:", time_leiden)
-    
+    quit()
     
     print("-------------SCAN---------------")
     # SCAN算法的参数
@@ -153,7 +154,8 @@ if __name__ == "__main__":
     print("-------------spectral_clustering---------------")
     
     t1 = time.time()
-    spectral_clustering_c_n_mapping = spectralClustering(cos_graph, args.seed, l, weighted)
+    # spectral_clustering_c_n_mapping = spectralClustering(cos_graph, args.seed, l, weighted)
+    spectral_clustering_c_n_mapping = spectral_clustering_cupy(cos_graph, args.seed, l, weighted)
     t2 = time.time()
     spectral_clustering_sil_score, spectral_clustering_cal_score, spectral_clustering_dav_score, spectral_clustering_our_sim, spectral_clustering_clustering_entropy=evaluation(graph, spectral_clustering_c_n_mapping)
     time_spectral = t2-t1

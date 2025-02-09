@@ -468,6 +468,9 @@ dataset_name_path = {
     "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/narrativeqa_all.json",
     "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/narrativeqa.json",
     "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/narrativeqa.json",
+    "popqa": "/mnt/data/wangshu/hcarag/ids_data/Popqa/Question.json",
+    "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/summary_Question.json",
+    "multihop_summary_6k": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/summary_Question.json",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/webqsp_qa.json",
 }
 
@@ -480,6 +483,9 @@ baseline_save_path_dict = {
     "narrativeqa": "/mnt/data/wangshu/hcarag/narrativeqa/dataset/baseline",
     "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset",
     "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset",
+    "popqa": "/mnt/data/wangshu/hcarag/ids_data/Popqa/baseline",
+    "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/baseline_summary",
+    "multihop_summary_6k": "/mnt/data/wangshu/hcarag/ids_data/multihop-rag-summary-6k/baseline_summary",
     "webqsp": "/mnt/data/wangshu/hcarag/WebQSP/dataset/baseline",
 }
 

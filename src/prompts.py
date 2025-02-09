@@ -421,7 +421,8 @@ Do not include information where the supporting evidence for it is not provided.
 Output:"""
 
 GENERATION_RESPONSE_FORMAT = {
-    "MP": "Multiple Paragraphs",
+    # "MP": "Multiple Paragraphs",
+    "MP": "Multiple Paragraphs. You should provide a detailed and comprehensive response with multiple paragraphs as long as possible.",
     "SP": "Single Paragraph",
     "SS": "Single Sentence",
     "QA": """Please respond using the format outlined below, ensuring each section begins with the specified phrases and symbols.

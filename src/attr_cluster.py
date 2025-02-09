@@ -4,12 +4,19 @@ import math
 import numpy as np
 import networkx as nx
 import pandas as pd
+import tqdm
+import cupy as cp
+import scipy.sparse as sp
 from graspologic.partition import hierarchical_leiden, leiden
-from src.utils import *
-from community_report import community_report_batch
 from sklearn.cluster import SpectralClustering
 from scipy.sparse import csr_matrix
-import tqdm
+from sklearn.cluster import KMeans
+from cupy.sparse.linalg import eigsh
+
+
+from src.utils import *
+from src.community_report import community_report_batch
+
 
 def attribute_hierarchical_clustering(
     weighted_graph: nx.graph, attributes: pd.DataFrame
@@ -154,6 +161,7 @@ def spectralClustering(graph: nx.graph, seed, l, is_weighted):
     index = np.array([node for node in graph.nodes()])
     # 谱聚类
 
+    num_worker_spec = 32
     if not is_weighted:
         # 非加权图
         adj_matrix = nx.to_scipy_sparse_array(graph, dtype=np.int32, format="csr")
@@ -164,6 +172,8 @@ def spectralClustering(graph: nx.graph, seed, l, is_weighted):
             assign_labels="discretize",
             random_state=seed,
             n_clusters=l,
+            n_jobs=num_worker_spec,
+            verbose=True,
         )
     else:
         # 加权图
@@ -182,18 +192,79 @@ def spectralClustering(graph: nx.graph, seed, l, is_weighted):
             assign_labels="discretize",
             random_state=seed,
             n_clusters=l,
+            n_jobs=num_worker_spec,
+            verbose=True,
         )
+
+    print("Start fit predict")
 
     # 获取聚类结果
     cluster_result = sc.fit_predict(adj_matrix)
 
     # 转换成c_n_mapping的格式
-
     for node, label in enumerate(cluster_result):
         cluster_label = str(label)
         if cluster_label not in c_n_mapping:
             c_n_mapping[cluster_label] = []
         c_n_mapping[cluster_label].append(index[node])
+    return c_n_mapping
+
+
+def spectral_clustering_cupy(graph: nx.graph, seed, number_cluster, is_weighted):
+    if number_cluster < 1:
+        number_cluster = 1
+
+    c_n_mapping: dict[str, list[int]] = {}
+    index = np.array([node for node in graph.nodes()])
+    if is_weighted:
+        # 如果是加权图，使用边的权重
+        adj_matrix = nx.adjacency_matrix(graph, weight="weight")
+    else:
+        # 如果是无权图，权重为1
+        adj_matrix = nx.adjacency_matrix(graph)
+
+    # transform the adjacency to sparse matrix
+    adj_matrix = adj_matrix.astype(float)
+    adj_matrix = sp.csr_matrix(adj_matrix)
+
+    print("finish compute_laplacian_matrix")
+
+    # 将邻接矩阵转换为CuPy的稀疏矩阵
+    adj_matrix_gpu = cp.sparse.csr_matrix(adj_matrix)
+
+    # 计算度矩阵D
+    degrees = cp.array(adj_matrix_gpu.sum(axis=1)).flatten()  # 行和作为度数
+    degree_matrix = cp.sparse.diags(degrees)
+
+    # 计算拉普拉斯矩阵L = D - A
+    laplacian_matrix = degree_matrix - adj_matrix_gpu
+
+    top_k_eig = min(number_cluster, 200)
+    try:
+        # 使用CuPy计算拉普拉斯矩阵的前k个特征值和特征向量
+        eigvals, eigvecs = eigsh(laplacian_matrix, k=top_k_eig, which="LA")
+    except Exception as e:
+        print(f"Error during eigendecomposition: {e}")
+    finally:
+        # release cuda memory
+        cp.get_default_memory_pool().free_all_blocks()
+    print("finish cp.linalg.eigh, number of eigvals:", len(eigvals))
+    print("eigvecs shape:", eigvecs.shape)
+
+    # 选择前k个最小特征值对应的特征向量
+    eigvecs_selected = eigvecs[:, :top_k_eig]
+
+    # 对特征向量进行k-means聚类
+    kmeans = KMeans(n_clusters=number_cluster, random_state=seed)
+    clusters = kmeans.fit_predict(eigvecs_selected.get())
+        
+    for node, label in enumerate(clusters):
+        cluster_label = str(label)
+        if cluster_label not in c_n_mapping:
+            c_n_mapping[cluster_label] = []
+        c_n_mapping[cluster_label].append(index[node])
+
+    print("number of clusters:", len(set(c_n_mapping)))
     return c_n_mapping
 
 
@@ -372,7 +443,9 @@ def attr_cluster(
                 )
             else:
                 num_c = int(cos_graph.number_of_nodes() / (args.max_cluster_size))
-                c_n_mapping = spectralClustering(cos_graph, args.seed, num_c, True)
+                c_n_mapping = spectral_clustering_cupy(
+                    cos_graph, args.seed, num_c, True
+                )
         else:
             if args.cluster_method == "weighted_leiden":
                 c_n_mapping = compute_leiden_max_size(
@@ -380,13 +453,20 @@ def attr_cluster(
                 )
             else:
                 num_c = int(cos_graph.number_of_nodes() / (args.max_cluster_size))
-                c_n_mapping = spectralClustering(cos_graph, args.seed, num_c, False)
+                c_n_mapping = spectral_clustering_cupy(
+                    cos_graph, args.seed, num_c, False
+                )
 
         # # 使用 Leiden 算法进行聚类
         # if args.max_cluster_size != 0:
 
         # else:
         #     c_n_mapping = compute_leiden(cos_graph, args.seed)
+
+        # check for finish
+        number_of_clusters = len(c_n_mapping)
+        if number_of_clusters < min_clusters:
+            break
 
         # 如果不是第一层，需要调整 community_id
         if level > 1:
@@ -447,11 +527,6 @@ def attr_cluster(
         new_community_df.to_csv(tmp_comunity_df_result, index=False)
         community_df = pd.concat([community_df, new_community_df], ignore_index=True)
         level += 1
-
-        # check for finish
-        number_of_clusters = len(c_n_mapping)
-        if number_of_clusters < min_clusters:
-            break
 
     return community_df, all_token
 
