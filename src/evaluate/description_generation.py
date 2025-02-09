@@ -20,9 +20,9 @@ def llm_invoker(
     # # base_url = "http://10.26.1.186:6667/v1"
     # engine = "llama3.1:8b4k"
     
-    api_key = "sk-AXOFue6Q3Tn9wEEP88Dc25C20d6549Da8d186557C9EcD7F9"
-    base_url = "https://api.ai-gaochao.cn/v1"
-    engine = "gpt-4o-2024-11-20"
+    api_key = ""
+    base_url = ""
+    engine = ""
     
     client = OpenAI(api_key=api_key, base_url=base_url)
     messages = [
