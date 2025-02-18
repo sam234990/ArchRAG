@@ -35,3 +35,5 @@ bash dataset/query.sh
 ## Data format and Environment
 
 Comming soon.
+
+One can use GraphRAG to construct the Knowledge graph and use the "final_entity" and "final_relationship" file.
