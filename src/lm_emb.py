@@ -1,14 +1,10 @@
 from tqdm import tqdm
-import gensim
 import torch
 from torch import nn
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
-import numpy as np
-import openai
 from openai import OpenAI
-
 
 # pretrained_repo = "/mnt/data/wangshu/all-roberta-large-v1"
 
@@ -126,7 +122,9 @@ def sber_text2embedding(model, tokenizer, device, text, batch_size=16):
     return all_embeddings
 
 
-def text_to_embedding_batch(model, tokenizer, device, texts, batch_size=32, embedding_dim=1024):
+def text_to_embedding_batch(
+    model, tokenizer, device, texts, batch_size=32, embedding_dim=1024
+):
     """
     Encode a list of texts into embeddings using a specified model and tokenizer.
 
@@ -248,8 +246,6 @@ def openai_embedding(input_text, api_key, api_base, engine="text-embedding-ada-0
     """
     try:
         # Set up OpenAI API credentials and base URL
-        # TODO: The 'openai.api_base' option isn't read in the client API. You will need to pass it when you instantiate the client, e.g. 'OpenAI(base_url=api_base)'
-        # openai.api_base = api_base
         client = OpenAI(api_key=api_key, base_url=api_base)
 
         # Request the embedding from the OpenAI API
