@@ -102,7 +102,6 @@ if __name__ == "__main__":
     # final_entities = entity_embedding(final_entities, args=args)
     # print("Entity embedding done")
     entity_output_path = "/home/wangshu/rag/hier_graph_rag/datasets_io/entity.csv"
-    # final_entities.to_csv(entity_output_path, index=False)
 
     entity_df = pd.read_csv(entity_output_path)
     print(entity_df.shape)

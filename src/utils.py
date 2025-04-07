@@ -29,6 +29,24 @@ def num_tokens(text: str, token_encoder: tiktoken.Encoding | None = None) -> int
     return len(token_encoder.encode(text))  # type: ignore
 
 
+def clean_unicode_text(text):
+    """清理无效的 Unicode 代理字符和非法转义序列"""
+    if isinstance(text, str):
+        # 移除无效的代理字符（\ud800-\udfff）
+        text = re.sub(r"[\ud800-\udfff]", "", text)
+        # 可选：移除其他非法转义序列（如 \u 后跟非16进制字符）
+        text = re.sub(r"\\u[^0-9a-fA-F]{4}", "", text)
+    return text
+
+
+def clean_dataframe(df):
+    # 仅清理字符串列
+    str_cols = df.select_dtypes(include=["object", "string"]).columns
+    for col in str_cols:
+        df[col] = df[col].apply(clean_unicode_text)
+    return df
+
+
 def read_graph_nx(
     file_path: str,
     relationship_filename: str = "create_final_relationships.parquet",
@@ -50,6 +68,10 @@ def read_graph_nx(
         final_entities = pd.read_csv(entity_file_path)
     else:
         final_entities = pd.read_parquet(entity_file_path)
+
+    # clean unicode
+    relationships = clean_dataframe(relationships)
+    final_entities = clean_dataframe(final_entities)
 
     if "head_id" not in relationships.columns:
         name_to_id = dict(
@@ -561,21 +583,20 @@ def create_arg_parser():
         default=15,
         help="Set the maximum size of the cluster",
     )
-    
+
     parser.add_argument(
         "--augment_graph",
         type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to augment the graph or not",
     )
-    
+
     parser.add_argument(
         "--cluster_method",
         type=str,
         default="weighted_leiden",
         help="Set the clustering method for attribute clustering",
     )
-        
 
     # add LLM parameters
     parser.add_argument(
@@ -590,7 +611,7 @@ def create_arg_parser():
         type=str,
         # required=True,
         help="Base URL for the API service",
-        default="http://localhost:5000/forward",
+        default="http://localhost:5001/forward",
     )
 
     parser.add_argument(
@@ -658,7 +679,7 @@ def create_arg_parser():
         "--embedding_api_base",
         type=str,
         # required=True,
-        default="http://localhost:5000/forward",
+        default="http://localhost:5001/forward",
         help="Base URL for the API service",
     )
     parser.add_argument(
@@ -787,7 +808,7 @@ def create_inference_arg_parser():
         type=str,
         # required=True,
         help="Base URL for the API service",
-        default="http://localhost:5000/forward",
+        default="http://localhost:5001/forward",
     )
 
     parser.add_argument(
@@ -855,7 +876,7 @@ def create_inference_arg_parser():
         "--embedding_api_base",
         type=str,
         # required=True,
-        default="http://localhost:5000/forward",
+        default="http://localhost:5001/forward",
         help="Base URL for the API service",
     )
     parser.add_argument(
@@ -922,7 +943,7 @@ def create_inference_arg_parser():
         default=False,
         help="only use entity to inference",
     )
-    
+
     parser.add_argument(
         "--wo_hierarchical",
         type=lambda x: x.lower() == "true",
