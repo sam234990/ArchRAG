@@ -11,6 +11,9 @@ For more details, check out our paper.
 
 We implement the C-HNSW with faiss framework. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
 
+```bash
+pip install -r requirements.txt
+```
 
 ## Running ArchRAG
 
