@@ -2,7 +2,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
-# from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
 from openai import OpenAI
 
