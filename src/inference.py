@@ -112,14 +112,40 @@ def hcarag_retrieval(
         args=args,
     )
 
-    all_results = []
+    # if query_paras['strategy'] == "all":
+    #     # Use GraphRAG method
+    #     print("Using GraphRAG method.")
+        
+    #     # get index_id in community_df if the level <= limit_level
+    #     limit_level = int(query_paras['range_level'])
+    #     selected_community = community_df[community_df['level'] <= limit_level]
+    #     index_id_list = selected_community['index_id'].to_list()
+        
+    #     saerch_params = faiss.SearchParametersHCHNSW()
+    #     saerch_params.search_level = 0
+    #     _, preds = hc_index.search(
+    #         query_embedding, k=query_paras['k_each_level'], params=saerch_params
+    #     )
 
+    #     # 将 numpy 数组展平成一维，并添加到 all_results 中
+    #     preds_flat = preds.flatten()
+
+    #     # combine preds_flat and index_id_list into final_predictions 
+        
+    #     final_predictions = index_id_list + preds_flat.tolist()
+    # else:    
+    all_results = []
     if query_paras["only_entity"] is True:
         query_max_levl = 1
     elif query_paras["wo_hierarchical"] is False:
         query_max_levl = 2
     else:
         query_max_levl = hc_level + 1
+
+    if query_paras['strategy'] == "all":
+        query_max_levl = int(query_paras['range_level']) + 1
+        print("Using GraphRAG method.")
+
 
     for level in range(query_max_levl):
         saerch_params = faiss.SearchParametersHCHNSW()
@@ -356,6 +382,13 @@ def load_strategy(
         k_per_level = [k_each_level] * number_levels
 
         return k_final, k_per_level, 0
+    elif strategy == "all":
+        k_each_level = query_paras["k_each_level"]
+        k_final = query_paras["k_final"]
+        k_per_level = [k_each_level] + [200] * query_paras["range_level"]
+
+        return k_final, k_per_level, 0
+    
     elif strategy == "inference":
         k_final = query_paras["k_final"]
 
@@ -479,6 +512,11 @@ def load_villa_index(args):
         "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.json",
         "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/corpus_chunk.json",
         "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/corpus_chunk.json",
+        "lifestyle": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/lifestyle/Corpus.json",
+        "recreation": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/recreation/Corpus.json",
+        "science": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/science/Corpus.json",
+        "technology": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/technology/Corpus.json",
+        "writing": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/writing/Corpus.json",
     }
     index_path = {
         "hotpot": "/mnt/data/wangshu/hcarag/HotpotQA/dataset/rag_hotpotqa_corpus.index",
@@ -487,6 +525,11 @@ def load_villa_index(args):
         "multihop_summary": "/mnt/data/wangshu/hcarag/MultiHop-RAG/dataset/rag_multihop_summary_corpus.index",
         "narrativeqa_train": "/mnt/data/wangshu/hcarag/narrativeqa/data/train/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
         "narrativeqa_test": "/mnt/data/wangshu/hcarag/narrativeqa/data/test/{doc_idx}/qa_dataset/rag_corpus_chunk.index",
+        "lifestyle": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/lifestyle/vanilla.index",
+        "recreation": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/recreation/vanilla.index",
+        "science": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/science/vanilla.index",
+        "technology": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/technology/vanilla.index",
+        "writing": "/mnt/data/wangshu/hcarag/RAG-QA-Arena/writing/vanilla.index",
     }
 
     index_file = index_path[dataset_name]
@@ -498,6 +541,10 @@ def load_villa_index(args):
 
     index = faiss.read_index(index_file)
     corpus = pd.read_json(corpus_file, lines=True, orient="records")
+    
+    if "context" in corpus.columns:
+        corpus.rename(columns={"context": "content"}, inplace=True)
+    
     return index, corpus
 
 

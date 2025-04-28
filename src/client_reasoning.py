@@ -529,6 +529,7 @@ def map_inference(
     if parallel_flag == False:
         all_result = []
         all_token = 0
+        # print(f"Total chunks: {len(all_chunks)}")
         for chunk in all_chunks:
             res, cur_token = map_llm_worker(chunk, args)
             all_token += cur_token

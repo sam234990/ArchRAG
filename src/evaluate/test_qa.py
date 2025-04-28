@@ -57,9 +57,16 @@ def test_qa(query_paras, args):
     # 1. load dataset and index
     index_dict = load_index(args)
 
-    dataset_path = dataset_name_path[args.dataset_name]
-    if "narrative" in args.dataset_name:
-        dataset_path = dataset_path.format(doc_idx=args.doc_idx)
+    ragqa_list = ["lifestyle", "recreation", "technology", "science", "writing"]
+
+    if args.dataset_name in ragqa_list:
+        dataset_path = (
+            f"/mnt/data/wangshu/hcarag/RAG-QA-Arena/{args.dataset_name}/Question.json"
+        )
+    else:
+        dataset_path = dataset_name_path[args.dataset_name]
+        if "narrative" in args.dataset_name:
+            dataset_path = dataset_path.format(doc_idx=args.doc_idx)
 
     qa_df = load_datasets(dataset_path)
 
@@ -70,7 +77,8 @@ def test_qa(query_paras, args):
     qa_df = qa_df.iloc[:10] if DEBUG_FLAG else qa_df
 
     save_file_str = "_".join([str(value) for value in query_paras.values()])
-    save_file_str += ".csv"
+    # save_file_str += ".csv"
+    save_file_str += "_newprompt.csv"
     if args.dataset_name == "multihop_summary":
         inference_output_dir = args.output_dir + "/summary"
     else:
@@ -117,7 +125,6 @@ def test_qa(query_paras, args):
         else:
             qa_df.loc[idx, "raw_result"] = "None"
             qa_df.loc[idx, "pred"] = "None"
-            
 
     print(f"Finish query Time: {time.time() - start_time:.2f} seconds")
     print(f"Total token: {all_token}")
@@ -134,7 +141,7 @@ def eval_inference(prediction_path, args):
     if args.dataset_name == "multihop_summary":
         print("Summarization task will be evaluated by LLM, use summary_eval.py file.")
         return
-    
+
     if args.eval_mode == "KGQA":
         acc = get_accuracy_webqsp_qa(prediction_path)
         print(f"Test Hit {acc}")
@@ -314,6 +321,7 @@ if __name__ == "__main__":
         "response_type": args.response_type,
         "involve_llm_res": args.involve_llm_res,
         "topk_chunk": args.topk_chunk,
+        "range_level": args.range_level,
     }
     # query_paras = {
     #     "strategy": "global",

@@ -10,6 +10,7 @@ textpattern/
 HISTORY.txt
 README.txt
 
+analysis/
 __pycache__/
 other_baseline/
 wandb/

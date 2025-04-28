@@ -533,6 +533,11 @@ Output:
 # These prompts should not be directly used in HCARAG search
 # Global search prompt
 
+# This score should evalute based on the following dimensions:
+# **Comprehensiveness**: How much detail does the answer provide to cover all aspects and details of the question?
+# **Diversity**: How varied and rich is the answer in providing different perspectives and insights on the question?
+# **Empowerment**: How well does the answer help the reader understand and make informed judgments about the topic?
+
 GLOBAL_MAP_SYSTEM_PROMPT = """
 ---Role---
 

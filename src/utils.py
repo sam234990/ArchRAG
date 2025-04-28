@@ -733,8 +733,8 @@ def create_inference_arg_parser():
         "--base_path",
         type=str,
         # required=True,
-        # default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag",
-        default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag",
+        default="/mnt/data/wangshu/hcarag/HotpotQA/hcarag",
+        # default="/mnt/data/wangshu/hcarag/MultiHop-RAG/hcarag",
         help="Base path to the directory containing the graph data.",
     )
 
@@ -984,6 +984,13 @@ def create_inference_arg_parser():
         type=str,
         default="QA",
         help="Type of response for generate answer",
+    )
+    
+    parser.add_argument(
+        "--range_level",
+        type=int,
+        default=2,
+        help="When use GraphRAG methods, use the level range of communities."
     )
 
     # log

@@ -85,7 +85,7 @@ def eval_single(i, query, answer1, answer2, args):
     ]
     # 准备用于传递给 API 的参数字典
     parameters = {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "messages": messages,
         "temperature": 0.1,
         "max_tokens": 4000,
@@ -210,12 +210,6 @@ if __name__ == "__main__":
         help="Path to the second input file containing the questions and answers",
     )
 
-    parser.add_argument(
-        "--output_file_name",
-        type=str,
-        help="Path to the output file to write the evaluation prompts",
-    )
-      
     parser.add_argument(
         "--output_file_name",
         type=str,
