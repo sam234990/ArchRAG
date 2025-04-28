@@ -9,11 +9,24 @@ For more details, check out our paper.
 
 ## Setup Environment
 
-We implement the C-HNSW with faiss framework. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
+This project implements C-HNSW using a custom Faiss framework. Follow the steps below to set up the environment correctly.
 
+
+### 1. Create a Python 3.10 Environment
+We recommend using conda to manage the environment:
+
+```bash
+conda create -n archrag python=3.10 -y
+conda activate archrag
+```
+
+### 2. Install Dependencies
+Install the required Python packages using:
 ```bash
 pip install -r requirements.txt
 ```
+### 3. Install Custom Faiss for C-HNSW
+The C-HNSW component requires a modified version of Faiss. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
 
 ## Running ArchRAG
 
@@ -68,5 +81,3 @@ Question
 ```
 
 One can use GraphRAG to construct the Knowledge graph and use the "final_entity" and "final_relationship" file.
-
-Environment will come soon.
