@@ -118,7 +118,6 @@ if __name__ == "__main__":
         [23352  7011  8219 20744  1989]]
     '''
     embeddings = np.stack(entity_df["embedding"].values)
-    # pdb.set_trace()
     
     # query_embedding -- entity_embedding
 

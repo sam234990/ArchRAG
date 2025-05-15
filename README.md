@@ -28,6 +28,10 @@ pip install -r requirements.txt
 ### 3. Install Custom Faiss for C-HNSW
 The C-HNSW component requires a modified version of Faiss. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
 
+```bash
+export PYTHONPATH=$(pwd):$PYTHONPATH
+```
+
 ## Running ArchRAG
 
 Using our ArchRAG framework requires a two-step, offline index and online retrieval.

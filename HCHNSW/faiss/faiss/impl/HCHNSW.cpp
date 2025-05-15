@@ -33,7 +33,8 @@ HCHNSW::HCHNSW(int ML, int M, int CL, int VS) : rng(12345) {
 
     // reserve space for some variable for the vectors
     // if (VS <= 0) {
-    //     std::cerr << "Error: vector_size should be greater than 0" << std::endl;
+    //     std::cerr << "Error: vector_size should be greater than 0" <<
+    //     std::endl;
     // }
     vector_size = VS;
     levels.reserve(VS + 1);
@@ -78,7 +79,6 @@ void HCHNSW::set_level(size_t size, const idx_t* level) {
     }
     neighbors.resize(offsets.back(), -1);
 }
-
 
 void HCHNSW::add_leiden_hier_links_sequentially(
         idx_t no,
@@ -1002,16 +1002,27 @@ HCHNSWStats HCHNSW::search(
     storage_idx_t nearest = first_entry_points_in_level[max_level];
     float d_nearest = qdis(nearest);
 
-    for (int level = max_level; level > params->search_level; level--) {
-        // 1. find the nearest vector (clnv) in current level
-        HCHNSWStats local_stats =
-                greedy_update_nearest(*this, qdis, level, nearest, d_nearest);
-        stats.combine(local_stats);
-
-        // 2. find the linked vector of clnv in the next level
-        storage_idx_t next_level_entry = cross_neighbors[nearest];
-        d_nearest = qdis(next_level_entry);
+    if (params->entry_point != -1) {
+        storage_idx_t entry_point = params->entry_point;
+        if (levels[entry_point] != params->search_level + 1) {
+            std::cerr << "Error: entry point " << entry_point
+                      << " is not in the level above search level" << std::endl;
+        }
+        storage_idx_t next_level_entry = cross_neighbors[entry_point];
         nearest = next_level_entry;
+        d_nearest = qdis(nearest);
+    } else {
+        for (int level = max_level; level > params->search_level; level--) {
+            // 1. find the nearest vector (clnv) in current level
+            HCHNSWStats local_stats = greedy_update_nearest(
+                    *this, qdis, level, nearest, d_nearest);
+            stats.combine(local_stats);
+
+            // 2. find the linked vector of clnv in the next level
+            storage_idx_t next_level_entry = cross_neighbors[nearest];
+            d_nearest = qdis(next_level_entry);
+            nearest = next_level_entry;
+        }
     }
 
     // find the true nearest entry in pt_level

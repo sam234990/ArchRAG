@@ -289,7 +289,7 @@ void hchnsw_search(
     for (idx_t i0 = 0; i0 < n; i0 += check_period) {
         idx_t i1 = std::min(i0 + check_period, n);
 
-        // #pragma omp parallel if (i1 - i0 > 1)
+        #pragma omp parallel if (i1 - i0 > 1)
         {
             VisitedTable vt(index->ntotal);
             typename BlockResultHandler::SingleResultHandler res(bres);
@@ -297,7 +297,7 @@ void hchnsw_search(
             std::unique_ptr<DistanceComputer> dis(
                     storage_distance_computer(index->storage));
 
-            // #pragma omp for reduction(+ : n1, n2, ndis, nhops)
+            #pragma omp for reduction(+ : n1, n2, ndis, nhops)
             // schedule(guided)
             for (idx_t i = i0; i < i1; i++) {
                 res.begin(i);

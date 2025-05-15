@@ -111,14 +111,32 @@ def test_hnsw_hchnsw(
     
     index_hchnsw = faiss.read_index(hchnsw_save_path)
     
+    entry = -1
+    for search_l in range(max_level, search_level - 1, -1):
+        print(f"Searching at search level: {search_l}")
+        params = faiss.SearchParametersHCHNSW()
+        params.search_level = search_l
+        params.entry_point = entry
+        
+        distance, preds = index_hchnsw.search(queries, k=top_k, params=params)
+        preds_copy = preds.flatten()
+        entry = int(preds_copy[0])
+        print(f"Entry point: {entry}")
+        print(type(entry))
+        
+        for i in range(3):
+            print(f"Query number: {i} Top {top_k} results: {preds[i]}")
+            print(f"Distances: {distance[i]}")
+            print()
+    
 
-    params = faiss.SearchParametersHCHNSW()
-    params.search_level = search_level
-    distance, preds = index_hchnsw.search(queries, k=top_k, params=params)
-    for i in range(3):
-        print(f"Query number: {i} Top {top_k} results: {preds[i]}")
-        print(f"Distances: {distance[i]}")
-        print()
+    # params = faiss.SearchParametersHCHNSW()
+    # params.search_level = search_level
+    # distance, preds = index_hchnsw.search(queries, k=top_k, params=params)
+    # for i in range(3):
+    #     print(f"Query number: {i} Top {top_k} results: {preds[i]}")
+    #     print(f"Distances: {distance[i]}")
+    #     print()
 
 
 if __name__ == "__main__":

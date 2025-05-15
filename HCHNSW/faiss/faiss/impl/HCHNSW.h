@@ -27,6 +27,7 @@ struct SearchParametersHCHNSW : SearchParameters {
     bool bounded_queue = true;
     // this is the level where we search for the nearest neighbors
     int search_level = -1;
+    int32_t entry_point = -1; // entry point for search if not set
 
     ~SearchParametersHCHNSW() {}
 };
