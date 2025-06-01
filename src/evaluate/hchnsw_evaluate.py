@@ -384,37 +384,37 @@ if __name__ == "__main__":
         baseline_index_list, queries, ground_truth
     )
     
-    for k in range(len(base_recall)):
-        print(f"topk {topks[k]}:")
-        print(
-            f"baseline recall: {base_recall[k]:.4f}, baseline time: {base_time[k]:.2f}s"
-        )
-        for lvl in range(max_level + 1):
-            print(
-                f"level {lvl} baseline time: {base_per_level_time[topks[k]][lvl]:.4f}s"
-            )
-    
-    
-    # # test hchnsw index
-    # hchnsw_time, hchnsw_recall, hchnsw_per_level_time = test_hchnsw_index(
-    #     hchnsw_index, queries, ground_truth, level_offset, fast_query=False
-    # )
-
-    # hchnsw_fast_time, hchnsw_fast_recall, hchnsw_fast_per_level_time = (
-    #     test_hchnsw_index(
-    #         hchnsw_index, queries, ground_truth, level_offset, fast_query=True
-    #     )
-    # )
-    # # print results
     # for k in range(len(base_recall)):
     #     print(f"topk {topks[k]}:")
     #     print(
-    #         f"baseline recall: {base_recall[k]:.4f}, hchnsw recall: {hchnsw_recall[k]:.4f}, hchnsw fast recall: {hchnsw_fast_recall[k]:.4f}"
-    #     )
-    #     print(
-    #         f"baseline time: {base_time[k]:.2f}s, hchnsw time: {hchnsw_time[k]:.2f}s, hchnsw fast time: {hchnsw_fast_time[k]:.2f}s"
+    #         f"baseline recall: {base_recall[k]:.4f}, baseline time: {base_time[k]:.2f}s"
     #     )
     #     for lvl in range(max_level + 1):
     #         print(
-    #             f"level {lvl} baseline time: {base_per_level_time[topks[k]][lvl]:.4f}s, hchnsw fast time: {hchnsw_fast_per_level_time[topks[k]][lvl]:.4f}s"
+    #             f"level {lvl} baseline time: {base_per_level_time[topks[k]][lvl]:.4f}s"
     #         )
+    
+    
+    # test hchnsw index
+    hchnsw_time, hchnsw_recall, hchnsw_per_level_time = test_hchnsw_index(
+        hchnsw_index, queries, ground_truth, level_offset, fast_query=False
+    )
+
+    hchnsw_fast_time, hchnsw_fast_recall, hchnsw_fast_per_level_time = (
+        test_hchnsw_index(
+            hchnsw_index, queries, ground_truth, level_offset, fast_query=True
+        )
+    )
+    # print results
+    for k in range(len(base_recall)):
+        print(f"topk {topks[k]}:")
+        print(
+            f"baseline recall: {base_recall[k]:.4f}, hchnsw recall: {hchnsw_recall[k]:.4f}, hchnsw fast recall: {hchnsw_fast_recall[k]:.4f}"
+        )
+        print(
+            f"baseline time: {base_time[k]:.2f}s, hchnsw time: {hchnsw_time[k]:.2f}s, hchnsw fast time: {hchnsw_fast_time[k]:.2f}s"
+        )
+        for lvl in range(max_level + 1):
+            print(
+                f"level {lvl} baseline time: {base_per_level_time[topks[k]][lvl]:.4f}s, hchnsw fast time: {hchnsw_fast_per_level_time[topks[k]][lvl]:.4f}s"
+            )
