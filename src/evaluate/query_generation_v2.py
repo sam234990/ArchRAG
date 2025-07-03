@@ -13,16 +13,13 @@ def llm_invoker(
     input_text, temperature=0.7, max_tokens=16384, max_retries=5, json=False
 ):
 
-    # api_key = "ollama"
-    # # base_url = "http://localhost:11434/v1"
-    # base_url = "http://localhost:5000/forward"
-    # # base_url = "http://10.26.1.21:8877/v1"
-    # # base_url = "http://10.26.1.186:6667/v1"
-    # engine = "llama3.1:8b4k"
+    api_key = "ollama"
+    # base_url = "http://localhost:11434/v1"
+    base_url = "http://localhost:5000/forward"
+    # base_url = "http://10.26.1.21:8877/v1"
+    # base_url = "http://10.26.1.186:6667/v1"
+    engine = "llama3.1:8b4k"
     
-    api_key = "sk-AXOFue6Q3Tn9wEEP88Dc25C20d6549Da8d186557C9EcD7F9"
-    base_url = "https://api.ai-gaochao.cn/v1"
-    engine = "gpt-4o-2024-11-20"
     
     client = OpenAI(api_key=api_key, base_url=base_url)
     messages = [
