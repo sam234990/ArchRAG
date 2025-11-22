@@ -6,13 +6,14 @@ Retrieval-Augmented Generation"
 ArchRAG is a novel graph-based RAG approach by using attributed communities organized hierarchically, and introduce a novel LLM-based hierarchical clustering method.
 For more details, check out our paper.
 
+Paper link: [Arxiv](https://arxiv.org/abs/2502.09891)
 
 ## Setup Environment
 
 This project implements C-HNSW using a custom Faiss framework. Follow the steps below to set up the environment correctly.
 
-
 ### 1. Create a Python 3.10 Environment
+
 We recommend using conda to manage the environment:
 
 ```bash
@@ -21,11 +22,15 @@ conda activate archrag
 ```
 
 ### 2. Install Dependencies
+
 Install the required Python packages using:
+
 ```bash
 pip install -r requirements.txt
 ```
+
 ### 3. Install Custom Faiss for C-HNSW
+
 The C-HNSW component requires a modified version of Faiss. Please refer to this [README](./HCHNSW/README.md) for installation instructions.
 
 ```bash
@@ -55,7 +60,6 @@ bash dataset/query.sh
 ```
 
 ## Data format and Environment
-
 
 Corpus
 

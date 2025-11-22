@@ -1,7 +1,7 @@
 base_path="archrag" # input dataset path 
 relationship_filename="create_final_relationships.parquet"
 entity_filename="create_final_entities.parquet"
-output_dir="archrag_index" # output index path
+output_dir="archrag_index" 
 wx_weight=0.8
 m_du_scale=1
 max_level=6
@@ -12,10 +12,16 @@ api_key="" #TODO
 api_base="" #TODO
 engine="llama3.1:8b4k" # llm engine
 
+# If you have embedding model settings, uncomment and set them here
+# And make sure to uncomment the corresponding line in the nohup command below
+# --embedding_model $embedding_model --embedding_api_key $embedding_api_key --embedding_api_base $embedding_api_base \    
+embedding_model="" # TODO
+embedding_api_key=""
+embedding_api_base=""
 
 augment_graph=True
 cluster_method="weighted_leiden"
-output_dir="" #TODO
+output_dir="" #TODO # output index path
 num_workers=10
 
 log_file="./index.log"
@@ -29,5 +35,6 @@ nohup python -u $python_file --base_path $base_path --relationship_filename $rel
     --entity_second_embedding $entity_second_embedding \
     --engine $engine --num_workers $num_workers \
     --augment_graph $augment_graph --cluster_method $cluster_method \
+    --api_key $api_key --api_base $api_base \
     > $log_file 2>&1 &
 echo "log file: $log_file"

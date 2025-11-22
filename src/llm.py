@@ -40,6 +40,11 @@ def llm_invoker(
         "frequency_penalty": 0,
         "presence_penalty": 0,
     }
+    # For thinking model, please add the following extra_body to disable the thinking process
+    if "qwen" in engine.lower():
+        parameters["extra_body"] = {
+            "chat_template_kwargs": {"enable_thinking": False}
+        } 
 
     # 如果 json 为 True，加入 response_format 参数
     if json:
