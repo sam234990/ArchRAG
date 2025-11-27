@@ -19,6 +19,7 @@ def make_hc_index(args):
         entity_filename=args.entity_filename,
         relationship_filename=args.relationship_filename,
     )
+    entities_df, graph = process_entity_embedding(entities_df, graph, args)
     print(
         f"Finished reading graph in {time.time() - overall_start_time:.2f} seconds ()"
     )

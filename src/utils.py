@@ -98,24 +98,46 @@ def read_graph_nx(
             graph.add_edge(row["head_id"], row["tail_id"])
 
     # process embedding
-    final_entities["description_embedding"] = final_entities[
-        "description_embedding"
-    ].apply(
-        lambda x: np.fromstring(x.strip("[]"), sep=",") if isinstance(x, str) else x
-    )
-    # add embedding to graph
-    for _, row in final_entities.iterrows():
-        # graph.nodes[row["name"]]["embedding"] = row["description_embedding"]
-        graph.nodes[row["human_readable_id"]]["embedding"] = row[
-            "description_embedding"
-        ]
+    # final_entities["description_embedding"] = final_entities[
+    #     "description_embedding"
+    # ].apply(
+    #     lambda x: np.fromstring(x.strip("[]"), sep=",") if isinstance(x, str) else x
+    # )
+    # # add embedding to graph
+    # for _, row in final_entities.iterrows():
+    #     # graph.nodes[row["name"]]["embedding"] = row["description_embedding"]
+    #     graph.nodes[row["human_readable_id"]]["embedding"] = row[
+    #         "description_embedding"
+    #     ]
 
     print(f"Number of nodes: {graph.number_of_nodes()}")
     print(f"Number of edges: {graph.number_of_edges()}")
-    ent_embedding_sample = final_entities.iloc[0]["description_embedding"]
-    print(f"embedding sample shape: {ent_embedding_sample.shape}")
+    # ent_embedding_sample = final_entities.iloc[0]["description_embedding"]
+    # print(f"embedding sample shape: {ent_embedding_sample.shape}")
 
     return graph, final_entities, relationships
+
+
+def process_entity_embedding(final_entities: pd.DataFrame, graph: nx.Graph, args):
+    if "embedding" in final_entities.columns:
+        # drop existing embedding column to avoid conflict
+        print("embedding column existing, drop it first")
+        final_entities = final_entities.drop(columns=["embedding"])
+    final_entities: pd.DataFrame = entity_embedding(
+        final_entities,
+        args=args,
+        num_workers=args.embedding_num_workers,
+        embed_colname="embedding",
+    )
+    entity_embedding_sample = final_entities.iloc[0]["embedding"]
+    if isinstance(entity_embedding_sample, list):
+        entity_embedding_sample = np.array(entity_embedding_sample)
+    print(f"entity embedding sample shape: {entity_embedding_sample.shape}")
+    # add embedding to graph
+    for _, row in final_entities.iterrows():
+        graph.nodes[row["human_readable_id"]]["embedding"] = row["embedding"]
+
+    return final_entities, graph
 
 
 def embedding_similarity(emb_1, emb_2):
@@ -985,12 +1007,12 @@ def create_inference_arg_parser():
         default="QA",
         help="Type of response for generate answer",
     )
-    
+
     parser.add_argument(
         "--range_level",
         type=int,
         default=2,
-        help="When use GraphRAG methods, use the level range of communities."
+        help="When use GraphRAG methods, use the level range of communities.",
     )
 
     # log
