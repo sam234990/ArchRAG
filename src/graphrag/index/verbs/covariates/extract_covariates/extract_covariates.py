@@ -18,6 +18,7 @@ from datashaper import (
     verb,
 )
 
+from graphrag.config_logging import safe_config
 from graphrag.index.cache import PipelineCache
 from graphrag.index.verbs.covariates.typing import Covariate, CovariateExtractStrategy
 
@@ -55,7 +56,7 @@ async def extract_covariates(
     ## Usage
     TODO
     """
-    log.debug("extract_covariates strategy=%s", strategy)
+    log.debug("extract_covariates strategy=%s", safe_config(strategy))
     if entity_types is None:
         entity_types = DEFAULT_ENTITY_TYPES
     output = cast(pd.DataFrame, input.get_input())

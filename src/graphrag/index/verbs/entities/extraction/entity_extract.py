@@ -17,6 +17,7 @@ from datashaper import (
     verb,
 )
 
+from graphrag.config_logging import safe_config
 from graphrag.index.bootstrap import bootstrap
 from graphrag.index.cache import PipelineCache
 
@@ -132,7 +133,7 @@ async def entity_extract(
         type: nltk
     ```
     """
-    log.debug("entity_extract strategy=%s", strategy)
+    log.debug("entity_extract strategy=%s", safe_config(strategy))
     if entity_types is None:
         entity_types = DEFAULT_ENTITY_TYPES
     output = cast(pd.DataFrame, input.get_input())

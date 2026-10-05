@@ -13,9 +13,11 @@ Backwards compatibility is not guaranteed at this time.
 
 from typing import Any
 
+
 import pandas as pd
 from pydantic import validate_call
 
+from graphrag.config_logging import safe_config
 from graphrag.config.models.graph_rag_config import GraphRagConfig
 from graphrag.index.progress.types import PrintProgressReporter
 from graphrag.model.entity import Entity
@@ -165,7 +167,7 @@ async def local_search(
         config.embeddings.vector_store if config.embeddings.vector_store else {}
     )
 
-    reporter.info(f"Vector Store Args: {vector_store_args}")
+    reporter.info(f"Vector Store Args: {safe_config(vector_store_args)}")
     vector_store_type = vector_store_args.get("type", VectorStoreType.LanceDB)
 
     _entities = read_indexer_entities(nodes, entities, community_level)

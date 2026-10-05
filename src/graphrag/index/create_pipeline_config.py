@@ -3,10 +3,10 @@
 
 """Default configuration methods definition."""
 
-import json
 import logging
 from pathlib import Path
 
+from graphrag.config_logging import format_config
 from graphrag.config.enums import (
     CacheType,
     InputFileType,
@@ -165,16 +165,11 @@ def _determine_skip_workflows(settings: GraphRagConfig) -> list[str]:
 def _log_llm_settings(settings: GraphRagConfig) -> None:
     log.info(
         "Using LLM Config %s",
-        json.dumps(
-            {**settings.entity_extraction.llm.model_dump(), "api_key": "*****"},
-            indent=4,
-        ),
+        format_config(settings.entity_extraction.llm.model_dump()),
     )
     log.info(
         "Using Embeddings Config %s",
-        json.dumps(
-            {**settings.embeddings.llm.model_dump(), "api_key": "*****"}, indent=4
-        ),
+        format_config(settings.embeddings.llm.model_dump()),
     )
 
 

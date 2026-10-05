@@ -6,6 +6,7 @@
 import tiktoken
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
+from graphrag.config_logging import safe_config
 from graphrag.config import (
     GraphRagConfig,
     LLMType,
@@ -38,11 +39,7 @@ def get_llm(config: GraphRagConfig) -> ChatOpenAI:
         config.llm.type == LLMType.AzureOpenAIChat
         or config.llm.type == LLMType.AzureOpenAI
     )
-    debug_llm_key = config.llm.api_key or ""
-    llm_debug_info = {
-        **config.llm.model_dump(),
-        "api_key": f"REDACTED,len={len(debug_llm_key)}",
-    }
+    llm_debug_info = safe_config(config.llm.model_dump())
     if config.llm.cognitive_services_endpoint is None:
         cognitive_services_endpoint = "https://cognitiveservices.azure.com/.default"
     else:
@@ -70,11 +67,7 @@ def get_llm(config: GraphRagConfig) -> ChatOpenAI:
 def get_text_embedder(config: GraphRagConfig) -> OpenAIEmbedding:
     """Get the LLM client for embeddings."""
     is_azure_client = config.embeddings.llm.type == LLMType.AzureOpenAIEmbedding
-    debug_embedding_api_key = config.embeddings.llm.api_key or ""
-    llm_debug_info = {
-        **config.embeddings.llm.model_dump(),
-        "api_key": f"REDACTED,len={len(debug_embedding_api_key)}",
-    }
+    llm_debug_info = safe_config(config.embeddings.llm.model_dump())
     if config.embeddings.llm.cognitive_services_endpoint is None:
         cognitive_services_endpoint = "https://cognitiveservices.azure.com/.default"
     else:

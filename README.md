@@ -8,6 +8,13 @@ For more details, check out our paper.
 
 Paper link: [Arxiv](https://arxiv.org/abs/2502.09891)
 
+## Safe Use
+
+Before running or sharing experiments, read [SECURITY.md](./SECURITY.md) for
+credential handling, W&B logging, trusted index/cache requirements, and the
+network restrictions on the optional pickle RPC examples. It also describes
+small offline security regression checks that do not run the experiment stack.
+
 ## Setup Environment
 
 This project implements C-HNSW using a custom Faiss framework. Follow the steps below to set up the environment correctly.

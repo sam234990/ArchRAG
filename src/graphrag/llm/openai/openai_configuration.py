@@ -3,10 +3,10 @@
 
 """OpenAI Configuration class definition."""
 
-import json
 from collections.abc import Hashable
 from typing import Any, cast
 
+from graphrag.config_logging import format_config
 from graphrag.llm.types import LLMConfig
 
 
@@ -271,11 +271,11 @@ class OpenAIConfiguration(Hashable, LLMConfig):
 
     def __str__(self) -> str:
         """Str method definition."""
-        return json.dumps(self.raw_config, indent=4)
+        return format_config(self.raw_config)
 
     def __repr__(self) -> str:
         """Repr method definition."""
-        return f"OpenAIConfiguration({self._raw_config})"
+        return f"OpenAIConfiguration({format_config(self._raw_config)})"
 
     def __eq__(self, other: object) -> bool:
         """Eq method definition."""

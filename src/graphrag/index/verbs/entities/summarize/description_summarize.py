@@ -19,6 +19,7 @@ from datashaper import (
     verb,
 )
 
+from graphrag.config_logging import safe_config
 from graphrag.index.cache import PipelineCache
 from graphrag.index.utils import load_graph
 
@@ -110,7 +111,7 @@ async def summarize_descriptions(
             proxy: !ENV ${GRAPHRAG_OPENAI_PROXY} # The proxy to use for azure
     ```
     """
-    log.debug("summarize_descriptions strategy=%s", strategy)
+    log.debug("summarize_descriptions strategy=%s", safe_config(strategy))
     output = cast(pd.DataFrame, input.get_input())
     strategy = strategy or {}
     strategy_exec = load_strategy(

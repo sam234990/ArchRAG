@@ -3,9 +3,9 @@
 
 """Parameterization settings for the default configuration."""
 
-from devtools import pformat
 from pydantic import Field
 
+from graphrag.config_logging import format_config
 import graphrag.config.defaults as defs
 
 from .cache_config import CacheConfig
@@ -34,11 +34,11 @@ class GraphRagConfig(LLMConfig):
 
     def __repr__(self) -> str:
         """Get a string representation."""
-        return pformat(self, highlight=False)
+        return format_config(self.model_dump())
 
     def __str__(self):
         """Get a string representation."""
-        return self.model_dump_json(indent=4)
+        return format_config(self.model_dump())
 
     root_dir: str = Field(
         description="The root directory for the configuration.", default=None

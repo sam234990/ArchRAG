@@ -12,6 +12,7 @@ import time
 import warnings
 from pathlib import Path
 
+from graphrag.config_logging import format_config
 from graphrag.config import (
     create_graphrag_config,
 )
@@ -39,33 +40,8 @@ log = logging.getLogger(__name__)
 
 
 def redact(input: dict) -> str:
-    """Sanitize the config json."""
-
-    # Redact any sensitive configuration
-    def redact_dict(input: dict) -> dict:
-        if not isinstance(input, dict):
-            return input
-
-        result = {}
-        for key, value in input.items():
-            if key in {
-                "api_key",
-                "connection_string",
-                "container_name",
-                "organization",
-            }:
-                if value is not None:
-                    result[key] = f"REDACTED, length {len(value)}"
-            elif isinstance(value, dict):
-                result[key] = redact_dict(value)
-            elif isinstance(value, list):
-                result[key] = [redact_dict(i) for i in value]
-            else:
-                result[key] = value
-        return result
-
-    redacted_dict = redact_dict(input)
-    return json.dumps(redacted_dict, indent=4)
+    """Format a recursively sanitized copy of the configuration."""
+    return format_config(input)
 
 
 def index_cli(

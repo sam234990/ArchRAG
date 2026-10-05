@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from devtools import pformat
 from pydantic import BaseModel
 from pydantic import Field as pydantic_Field
 
+from graphrag.config_logging import format_config
 from .cache import PipelineCacheConfigTypes
 from .input import PipelineInputConfigTypes
 from .reporting import PipelineReportingConfigTypes
@@ -21,11 +21,11 @@ class PipelineConfig(BaseModel):
 
     def __repr__(self) -> str:
         """Get a string representation."""
-        return pformat(self, highlight=False)
+        return format_config(self.model_dump())
 
     def __str__(self):
         """Get a string representation."""
-        return str(self.model_dump_json(indent=4))
+        return format_config(self.model_dump())
 
     extends: list[str] | str | None = pydantic_Field(
         description="Extends another pipeline configuration", default=None

@@ -4,7 +4,7 @@ from metric.metric import (
     calculate_davies_bouldin_score,
     calculate_our_similarity,
 )
-from src.utils import create_inference_arg_parser, read_graph_nx
+from src.utils import create_inference_arg_parser, read_graph_nx, print_args
 from metric.baseline import *
 from metric.CODICIL import *
 import pandas as pd
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     parser = create_inference_arg_parser()
     args, _ = parser.parse_known_args()
     args.max_cluster_size = 5
-    print(args)
+    print_args(args)
 
     graph, final_entities, final_relationships = read_graph_nx(args.base_path)
 

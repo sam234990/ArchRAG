@@ -11,6 +11,7 @@ os.environ["http_proxy"] = "http://127.0.0.1:7892"
 os.environ["https_proxy"] = "http://127.0.0.1:7892"
 
 from src.inference import *
+from src.experiment_logging import experiment_config, experiment_tracking_settings
 from src.utils import create_inference_arg_parser
 from src.evaluate.evaluate import *
 
@@ -51,7 +52,8 @@ def test_qa(query_paras, args):
     wandb.init(
         project=f"{args.project}",
         name=f"{args.dataset_name}_hcarag_{query_paras['generate_strategy']}",
-        config=args,
+        config=experiment_config(args),
+        settings=experiment_tracking_settings(wandb),
     )
 
     # 1. load dataset and index

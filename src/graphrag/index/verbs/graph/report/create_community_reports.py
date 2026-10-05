@@ -19,6 +19,7 @@ from datashaper import (
     verb,
 )
 
+from graphrag.config_logging import safe_config
 import graphrag.config.defaults as defaults
 import graphrag.index.graph.extractors.community_reports.schemas as schemas
 from graphrag.index.cache import PipelineCache
@@ -54,7 +55,7 @@ async def create_community_reports(
     **_kwargs,
 ) -> TableContainer:
     """Generate entities for each row, and optionally a graph of those entities."""
-    log.debug("create_community_reports strategy=%s", strategy)
+    log.debug("create_community_reports strategy=%s", safe_config(strategy))
     local_contexts = cast(pd.DataFrame, input.get_input())
     nodes_ctr = get_required_input_table(input, "nodes")
     nodes = cast(pd.DataFrame, nodes_ctr.table)

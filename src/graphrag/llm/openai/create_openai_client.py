@@ -27,11 +27,7 @@ def create_openai_client(
         if api_base is None:
             raise ValueError(API_BASE_REQUIRED_FOR_AZURE)
 
-        log.info(
-            "Creating Azure OpenAI client api_base=%s, deployment_name=%s",
-            api_base,
-            configuration.deployment_name,
-        )
+        log.info("Creating Azure OpenAI client")
         if configuration.cognitive_services_endpoint is None:
             cognitive_services_endpoint = "https://cognitiveservices.azure.com/.default"
         else:
@@ -54,7 +50,7 @@ def create_openai_client(
             max_retries=0,
         )
 
-    log.info("Creating OpenAI client base_url=%s", configuration.api_base)
+    log.info("Creating OpenAI client")
     return AsyncOpenAI(
         api_key=configuration.api_key,
         base_url=configuration.api_base,

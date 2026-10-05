@@ -1,5 +1,6 @@
 import tiktoken
 import argparse
+from src.graphrag.config_logging import safe_config
 from src.lm_emb import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -1035,12 +1036,8 @@ def create_inference_arg_parser():
 
 def print_args(args, print_str="Parsed Arguments:"):
     print(print_str)
-    if type(args) == argparse.Namespace:
-        for arg, value in vars(args).items():
-            print(f"{arg}: {value}")
-    elif type(args) == dict:
-        for arg, value in args.items():
-            print(f"{arg}: {value}")
+    for arg, value in safe_config(args).items():
+        print(f"{arg}: {value}")
 
 
 if __name__ == "__main__":
